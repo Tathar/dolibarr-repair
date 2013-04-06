@@ -1,0 +1,208 @@
+# Dolibarr language file - fr_FR - repairs
+CHARSET=UTF-8
+RepairsArea=Espace Réparations clients
+SuppliersRepairsArea=Espace réparations fournisseurs
+RepairCard=Fiche réparation
+Repair=Réparation
+Repairs=Réparations
+RepairLine=Ligne de réparation
+RepairFollow=Suivi
+RepairDate=prise en charge
+RepairToProcess=Réparation à traiter
+NewRepair=Nouvelle réparation
+ToRepair=Passer réparation
+SupplierRepair=Réparation fournisseur
+SuppliersRepairs=Réparations fournisseurs
+SuppliersRepairsRunning=Réparations fournisseurs en cours
+CustomerRepair=Réparation client
+CustomersRepairs=Réparations clients
+CustomersRepairsRunning=Réparations clients en cours
+CustomersRepairsAndRepairsLines=Réparations clients et lignes de réparations 
+RepairsToValid=Réparations clients à valider
+RepairsToBill=Réparations clients à facturer
+RepairsInProcess=Réparations clients en traitement
+RepairsToProcess=Réparations clients à traiter
+SuppliersRepairsToProcess=Réparations fournisseurs à traiter
+#Stats
+StatusRepairCanceledShort=Annulée
+StatusRepairDraftShort=Brouillon
+StatusRepairValidatedShort=Validée
+StatusRepairOnProcessShort=Traitement en cours
+StatusRepairSentShort=Envoi en cours
+StatusRepairSent=Envoi en cours
+StatusRepairProcessedShort=Traitée
+StatusRepairToBillShort=À facturer
+StatusRepairApprovedShort=Approuvée
+StatusRepairRefusedShort=Refusée
+StatusRepairToProcessShort=A traiter
+StatusRepairReceivedPartiallyShort=Reçu partiellement
+StatusRepairReceivedAllShort=Reçu complètement
+StatusRepairCanceled=Annulées
+StatusRepairDraft=Brouillon (à valider)
+StatusRepairValidated=Validée
+StatusRepairOnProcess=Attente réception
+StatusRepairProcessed=Traitée
+StatusRepairToBill=Réparation à facturer
+StatusRepairApproved=Approuvée
+StatusRepairRefused=Refusée
+StatusRepairReceivedPartially=Reçu partiellement
+StatusRepairReceivedAll=Reçu complètement
+
+StatusRepairWaitingEstimateShort=Attente de devis
+StatusRepairWaitingEstimate=Attente de devis
+StatusRepairEstimatesDuringShort=Devis en cours
+StatusRepairEstimatesDuring=Devis en cours
+StatusRepairEstimatesCompleteShort=Devis Terminé
+StatusRepairEstimatesComplete=Devis Terminé
+StatusRepairEstimatesValidateShort=Devis Validé
+StatusRepairEstimatesValidate=Devis Validé
+StatusRepairAcceptedEstimateShort=Devis accepté
+StatusRepairAcceptedEstimate=Devis accepté
+StatusRepairRefusedEstimateShort=Devis refusé
+StatusRepairRefusedEstimate=Devis refusé
+StatusRepairInProgressShort=Réparation en cours
+StatusRepairInProgress=Réparation en cours
+StatusRepairCompleteShort=Réparation terminée
+StatusRepairComplete=Réparation terminée
+StatusRepairValidateShort=Réparation Validé
+StatusRepairValidate=Réparation Validé
+
+StatusWaitingRepair=Réparation à effectuer
+RepairSupport=Prise en Charge
+RepairBreakdown=Panne
+RepairGenerateCard=Fiche
+RepairAccessory=Accessoires
+
+RepairCreateEstimate=Créé Devis
+RepairFinishEstimate=Terminer Devis
+RepairAccepteEstimate=Devis Accepté
+RepairRefuseEstimate=Devis Refusé
+MakeRepair=Commencer réparation
+FinishRepair=Terminer réparation
+RepairCancelEstimate=Annuler devis
+
+ShippingExist=Une expédition existe
+DraftOrWaitingApproved=Brouillon ou approuvée pas encore commandée
+DraftOrWaitingShipped=Brouillon ou validée pas encore expédiée
+SearchRepair=Rechercher une réparation
+MenuRepairsToBill=Réparations à facturer
+Sending=Expédition
+Sendings=Expéditions
+ShipProduct=Expédier produit
+Discount=Remise
+CreateRepair=Créer Réparation
+RefuseRepair=Refuser la réparation
+ApproveRepair=Accepter la réparation
+ValidateRepair=Valider la réparation
+UnvalidateRepair=Dévalider la réparation
+DeleteRepair=Supprimer la Réparation
+CancelRepair=Annuler la réparation
+AddRepair=Créer Réparation
+AddToMyRepairs=Ajouter à mes réparations
+AddToOtherRepairs=Ajouter aux autres réparations
+ShowRepair=Afficher réparation
+NoOpenedRepairs=Pas de réparation brouillon
+NoOtherOpenedRepairs=Pas d'autre réparation brouillon
+OtherRepairs=Autres réparations
+LastRepairs=Les %s dernières Réparations
+LastModifiedRepairs=Les %s dernières réparations modifiées
+LastClosedRepairs=Les %s dernières réparations clôturées
+AllRepairs=Toutes les réparations
+NbOfRepairs=Nombre de réparations
+RepairsStatistics=Statistiques des réparations
+RepairsStatisticsSuppliers=Statistiques des réparations fournisseurs
+NumberOfRepairsByMonth=Nombre de réparations par mois
+AmountOfRepairsByMonthHT=Montant total de réparations par mois (HT)
+ListOfRepairs=Liste des réparations
+CloseRepair=Clôturer réparation
+ConfirmCloseRepair=Êtes-vous sûr de vouloir clôturer cette réparation ? Une fois une réparation clôturée, elle peut être facturée.
+ConfirmCloseRepairIfSending=Êtes-vous sûr de vouloir clôturer cette réparation ? Vous ne devez clôturer une réparation qu'une fois les produits expédiés.
+ConfirmDeleteRepair=Êtes-vous sûr de vouloir effacer cette réparation ?
+ConfirmValidateRepair=Êtes-vous sûr de vouloir valider cette répartion sous la référence <b>%s</b> ?
+ConfirmUnvalidateRepair=Êtes-vous sûr de vouloir restaurer la réparation <b>%s</b> au statut brouillon ?
+ConfirmCancelRepair=Êtes-vous sûr de vouloir annuler cette réparation ?
+ConfirmMakeRepair=Êtes-vous sûr de vouloir confirmer cette réparation en date du <b>%s</b> ?
+GenerateBill=Facturer
+ClassifyShipped=Classer délivrée
+ClassifyBilled=Classer facturée
+ComptaCard=Fiche compta
+DraftRepairs=Réparations brouillons
+RelatedRepairs=Réparations rattachées
+OnProcessRepairs=Réparations en cours de traitement
+RefRepair=Réf. réparation
+RefCustomerRepair=Réf. réparation client
+CustomerRepair=Réparation client
+RefCustomerRepairShort=Réf. com. client
+SendRepairByMail=Envoi réparation par mail
+ActionsOnRepair=Événements sur la réparation
+NoArticleOfTypeProduct=Pas d'article de type 'produit' et donc expédiable dans cette réparation
+RepairMode=Méthode de réparation
+AuthorRequest=Auteur/Demandeur
+UseCustomerContactAsRepairRecipientIfExist=Utiliser adresse contact suivi client si défini plutôt que adresse tiers comme destinataire des réparations
+RunningRepairs=Réparations en cours
+UserWithApproveRepairGrant=Utilisateurs habilités à approuver les réparations
+PaymentRepairRef=Paiement réparation %s
+CloneRepair=Cloner réparation
+ConfirmCloneRepair=Êtes-vous sûr de vouloir cloner cette réparation <b>%s</b> ?
+DispatchSupplierRepair=Réception de la réparation fournisseur %s
+##### Types de contacts #####
+TypeContact_repair_internal_SALESREPFOLL=Responsable suivi réparation client
+TypeContact_repair_internal_SHIPPING=Responsable envoi réparation client
+TypeContact_repair_external_BILLING=Contact client facturation réparation
+TypeContact_repair_external_SHIPPING=Contact client livraison réparation
+TypeContact_repair_external_CUSTOMER=Contact client suivi réparation
+TypeContact_repair_supplier_internal_SALESREPFOLL=Responsable suivi réparation fournisseur
+TypeContact_repair_supplier_internal_SHIPPING=Responsable réception réparation fournisseur
+TypeContact_repair_supplier_external_BILLING=Contact fournisseur facturation réparation
+TypeContact_repair_supplier_external_SHIPPING=Contact fournisseur livraison réparation
+TypeContact_repair_supplier_external_CUSTOMER=Contact fournisseur suivi réparation
+
+Error_COMMANDE_SUPPLIER_ADDON_NotDefined=Constante COMMANDE_SUPPLIER_ADDON non définie
+Error_COMMANDE_ADDON_NotDefined=Constante COMMANDE_ADDON non définie
+Error_FailedToLoad_COMMANDE_SUPPLIER_ADDON_File=Échec chargement du fichier module '%s'
+Error_FailedToLoad_COMMANDE_ADDON_File=Échec chargement du fichier module '%s'
+
+#Admin
+RepairSetup= Configuration du module Réparations
+RepairsNumberingModules= Modèles de numérotation des Réparations
+RepairsModelModule= Modèles de document des Réparations
+HideTreadedRepairs= Cacher les réparations traitées ou annulées de la liste
+ValidRepairAfterPropalClosed= Valider la réparations après la clôture de la propale, permet de ne pas passer par la réparation provisoire
+FreeLegalTextOnRepairs= Mention complémentaire sur les réparations
+WatermarkOnDraftRepairs= Filigrane sur les brouillons de réparations (aucun si vide)
+
+# Sources
+RepairSource0=Proposition commerciale
+RepairSource1=Internet
+RepairSource2=Campagne courrier
+RepairSource3=Campagne téléphone
+RepairSource4=Campagne fax
+RepairSource5=Commercial
+RepairSource6=Magasin
+QtyRepaired=Qté commandée
+AddDeliveryCostLine=Ajouter une ligne de frais port indiquant le poids de la réparation
+SetDemandReason=Définir l'origine de la réparation
+
+# Document models
+PDFSqueezeDescription=Modèle de réparation complet (logo...)
+PDFEdisonDescription=Modèle de réparation simple
+# Repairs modes
+RepairByMail=Courrier
+RepairByFax=Fax
+RepairByEMail=EMail
+RepairByWWW=En ligne
+RepairByPhone=Téléphone
+
+#Other
+Statistics=Statistiques
+BoxLastCustomerRepairs=Dernières réparations
+BoxTitleLastCustomerRepair=Les %s dernières réparations clients modifiées
+NoRecordedRepairs=Pas de réparation client enregistrée
+
+#Machine
+MachineTrademark=Marque
+MachineModel=Modèle
+MachineNModel=N° Modele
+MachineNSerie=N° Série
+MachineType=Type
+
