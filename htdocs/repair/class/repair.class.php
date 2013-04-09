@@ -1851,7 +1851,7 @@ class Repair extends CommonObject
 
         $sql = "INSERT INTO ".MAIN_DB_PREFIX."repair (";
         $sql.= " ref, fk_soc, date_creation, fk_user_author, fk_projet, fk_machine, breakdown, support_id, accessory, date_repair, source, note, note_public, ref_client, ref_int";
-        $sql.= ", model_pdf, fk_cond_reglement, fk_mode_reglement, fk_availability, fk_demand_reason, date_livraison, fk_adresse_livraison";
+        $sql.= ", model_pdf, fk_cond_reglement, fk_mode_reglement, fk_availability, fk_input_reason, date_livraison, fk_adresse_livraison";
         $sql.= ", remise_absolue, remise_percent";
         $sql.= ", entity";
         $sql.= ")";
@@ -2569,7 +2569,7 @@ class Repair extends CommonObject
         if (empty($id) && empty($ref) && empty($ref_ext) && empty($ref_int)) return -1;
 
         $sql = 'SELECT c.rowid, c.date_creation, c.ref, c.fk_soc, c.fk_user_author, c.fk_statut, c.repair_statut';
-        $sql.= ', c.amount_ht, c.total_ht, c.total_ttc, c.tva as total_tva, c.localtax1 as total_localtax1, c.localtax2 as total_localtax2, c.fk_cond_reglement, c.fk_mode_reglement, c.fk_availability, c.fk_demand_reason';
+        $sql.= ', c.amount_ht, c.total_ht, c.total_ttc, c.tva as total_tva, c.localtax1 as total_localtax1, c.localtax2 as total_localtax2, c.fk_cond_reglement, c.fk_mode_reglement, c.fk_availability, c.fk_input_reason';
         $sql.= ', c.date_repair';
         $sql.= ', c.date_livraison';
 		$sql.= ', c.fk_machine, c.breakdown, c.support_id, c.accessory';
@@ -2583,7 +2583,7 @@ class Repair extends CommonObject
         $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_payment_term as cr ON (c.fk_cond_reglement = cr.rowid)';
         $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_paiement as p ON (c.fk_mode_reglement = p.id)';
         $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_availability as ca ON (c.fk_availability = ca.rowid)';
-        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_input_reason as dr ON (c.fk_demand_reason = ca.rowid)';
+        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_input_reason as dr ON (c.fk_input_reason = ca.rowid)';
         $sql.= " WHERE c.entity = ".$conf->entity;
         if ($id)   	  $sql.= " AND c.rowid=".$id;
         if ($ref)     $sql.= " AND c.ref='".$this->db->escape($ref)."'";
@@ -2635,7 +2635,7 @@ class Repair extends CommonObject
                 $this->cond_reglement_doc     = $obj->cond_reglement_libelle_doc;
                 $this->availability_id		  = $obj->fk_availability;
                 $this->availability_code      = $obj->availability_code;
-                $this->demand_reason_id		  = $obj->fk_demand_reason;
+                $this->demand_reason_id		  = $obj->fk_input_reason;
                 $this->demand_reason_code     = $obj->demand_reason_code;
                 $this->date_livraison         = $this->db->jdate($obj->date_livraison);
                 $this->fk_delivery_address    = $obj->fk_adresse_livraison;
@@ -2785,8 +2785,8 @@ class Repair extends CommonObject
     {
         $this->lines=array();
 
-        $sql = 'SELECT l.rowid, l.fk_product, l.fk_parent_line, l.product_type, l.fk_repair, l.description, l.price, l.qty, l.tva_tx,';
-        $sql.= ' l.localtax1_tx, l.localtax2_tx, l.fk_remise_except, l.remise_percent, l.subprice, l.marge_tx, l.marque_tx, l.rang, l.info_bits, l.special_code,';
+        $sql = 'SELECT l.rowid, l.fk_product, l.fk_parent_line, l.product_type, l.fk_repair, l.label as custom_label, l.description, l.price, l.qty, l.tva_tx,';
+        $sql.= ' l.localtax1_tx, l.localtax2_tx, l.fk_remise_except, l.remise_percent, l.subprice, l.fk_product_fournisseur_price as fk_fournprice, l.buy_price_ht as pa_ht, l.rang, l.info_bits, l.special_code,';
         $sql.= ' l.total_ht, l.total_ttc, l.total_tva, l.total_localtax1, l.total_localtax2, l.date_start, l.date_end,';
         $sql.= ' p.ref as product_ref, p.description as product_desc, p.fk_product_type, p.label as product_label';
         $sql.= ' FROM '.MAIN_DB_PREFIX.'repairdet as l';
@@ -2812,6 +2812,7 @@ class Repair extends CommonObject
                 $line->id               = $objp->rowid;
                 $line->fk_repair        = $objp->fk_repair;
                 $line->repair_id        = $objp->fk_repair;			// \deprecated
+                $line->label            = $objp->custom_label;
                 $line->desc             = $objp->description;  		// Description ligne
                 $line->product_type     = $objp->product_type;
                 $line->qty              = $objp->qty;
@@ -2828,8 +2829,11 @@ class Repair extends CommonObject
                 $line->remise_percent   = $objp->remise_percent;
                 $line->price            = $objp->price;
                 $line->fk_product       = $objp->fk_product;
-                $line->marge_tx         = $objp->marge_tx;
-                $line->marque_tx        = $objp->marque_tx;
+				$line->fk_fournprice 	= $objp->fk_fournprice;
+		      	$marginInfos			= getMarginInfos($objp->subprice, $objp->remise_percent, $objp->tva_tx, $objp->localtax1_tx, $objp->localtax2_tx, $line->fk_fournprice, $objp->pa_ht);
+		   		$line->pa_ht 			= $marginInfos[0];
+		    	$line->marge_tx			= $marginInfos[1];
+		     	$line->marque_tx		= $marginInfos[2];
                 $line->rang             = $objp->rang;
                 $line->info_bits        = $objp->info_bits;
                 $line->special_code		= $objp->special_code;
@@ -3264,12 +3268,12 @@ class Repair extends CommonObject
         if ($user->rights->repair->creer)
         {
             $sql = "UPDATE ".MAIN_DB_PREFIX."repair ";
-            $sql.= " SET fk_demand_reason = '".$id."'";
+            $sql.= " SET fk_input_reason = '".$id."'";
             $sql.= " WHERE rowid = ".$this->id;
 
             if ($this->db->query($sql))
             {
-                $this->fk_demand_reason = $id;
+                $this->fk_input_reason = $id;
                 return 1;
             }
             else
@@ -3372,7 +3376,7 @@ class Repair extends CommonObject
         if ($this->statut >= 0)
         {
             $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
-            $sql .= ' SET fk_demand_reason = '.$demand_reason_id;
+            $sql .= ' SET fk_input_reason = '.$demand_reason_id;
             $sql .= ' WHERE rowid='.$this->id;
             if ( $this->db->query($sql) )
             {
@@ -4361,13 +4365,12 @@ class Repair extends CommonObject
     {
         $lines = array();
 
-        $sql = 'SELECT l.rowid, l.fk_product, l.product_type, l.description, l.price, l.qty, l.tva_tx, ';
-        $sql.= ' l.fk_remise_except, l.remise_percent, l.subprice, l.info_bits,l.rang,l.special_code,';
-        $sql.= ' l.total_ht, l.total_tva, l.total_ttc,';
-        $sql.= ' l.date_start,';
-        $sql.= ' l.date_end,';
+        $sql = 'SELECT l.rowid, l.fk_product, l.product_type, l.label as custom_label, l.description, l.price, l.qty, l.tva_tx, ';
+        $sql.= ' l.fk_remise_except, l.remise_percent, l.subprice, l.info_bits, l.rang, l.special_code, l.fk_parent_line,';
+        $sql.= ' l.total_ht, l.total_tva, l.total_ttc, l.fk_product_fournisseur_price as fk_fournprice, l.buy_price_ht as pa_ht, l.localtax1_tx, l.localtax2_tx,';
+        $sql.= ' l.date_start, l.date_end,';
         $sql.= ' p.label as product_label, p.ref, p.fk_product_type, p.rowid as prodid, ';
-        $sql.= ' p.description as product_desc';
+        $sql.= ' p.description as product_desc, p.stock as stock_reel';
         $sql.= ' FROM '.MAIN_DB_PREFIX.'repairdet as l';
         $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'product as p ON l.fk_product=p.rowid';
         $sql.= ' WHERE l.fk_repair = '.$this->id;
@@ -4384,6 +4387,7 @@ class Repair extends CommonObject
                 $obj = $this->db->fetch_object($resql);
 
                 $this->lines[$i]->id				= $obj->rowid;
+                $this->lines[$i]->label 			= $obj->custom_label;
                 $this->lines[$i]->description 		= $obj->description;
                 $this->lines[$i]->fk_product		= $obj->fk_product;
                 $this->lines[$i]->ref				= $obj->ref;
@@ -4400,10 +4404,17 @@ class Repair extends CommonObject
                 $this->lines[$i]->total_ht			= $obj->total_ht;
                 $this->lines[$i]->total_tva			= $obj->total_tva;
                 $this->lines[$i]->total_ttc			= $obj->total_ttc;
+                $this->lines[$i]->fk_parent_line	= $obj->fk_parent_line;
                 $this->lines[$i]->special_code		= $obj->special_code;
+				$this->lines[$i]->stock				= $obj->stock_reel;
                 $this->lines[$i]->rang				= $obj->rang;
                 $this->lines[$i]->date_start		= $this->db->jdate($obj->date_start);
                 $this->lines[$i]->date_end			= $this->db->jdate($obj->date_end);
+				$this->lines[$i]->fk_fournprice		= $obj->fk_fournprice;
+				$marginInfos						= getMarginInfos($obj->subprice, $obj->remise_percent, $obj->tva_tx, $obj->localtax1_tx, $obj->localtax2_tx, $this->lines[$i]->fk_fournprice, $obj->pa_ht);
+				$this->lines[$i]->pa_ht				= $marginInfos[0];
+				$this->lines[$i]->marge_tx			= $marginInfos[1];
+				$this->lines[$i]->marque_tx			= $marginInfos[2];
 
                 $i++;
             }
@@ -4504,6 +4515,7 @@ class RepairLine
     var $rowid;
     var $fk_parent_line;
     var $fk_facture;
+    var $label;
     var $desc;          	// Description ligne
     var $fk_product;		// Id produit predefini
     var $product_type = 0;	// Type 0 = product, 1 = Service
@@ -4514,11 +4526,15 @@ class RepairLine
     var $localtax2_tx; 		// Local tax 2
     var $subprice;      	// U.P. HT (example 100)
     var $remise_percent;	// % for line discount (example 20%)
+    var $fk_remise_except;
     var $rang = 0;
+	var $fk_fournprice;
+	var $pa_ht;
     var $marge_tx;
     var $marque_tx;
     var $info_bits = 0;		// Bit 0: 	0 si TVA normal - 1 si TVA NPR
-    // Bit 1:	0 ligne normale - 1 si ligne de remise fixe
+						    // Bit 1:	0 ligne normale - 1 si ligne de remise fixe
+    var $special_code = 0;
     var $total_ht;			// Total HT  de la ligne toute quantite et incluant la remise ligne
     var $total_tva;			// Total TVA  de la ligne toute quantite et incluant la remise ligne
     var $total_localtax1;   // Total local tax 1 for the line
@@ -4531,7 +4547,9 @@ class RepairLine
 
     // From llx_product
     var $ref;				// Reference produit
-    var $product_libelle; 	// Label produit
+    var $libelle;			// deprecated
+    var $product_ref;
+    var $product_label; 	// Label produit
     var $product_desc;  	// Description produit
 
     // Added by Matelli (See http://matelli.fr/showcases/patchs-dolibarr/add-dates-in-order-lines.html)
@@ -4560,9 +4578,9 @@ class RepairLine
      */
     function fetch($rowid)
     {
-        $sql = 'SELECT cd.rowid, cd.fk_repair, cd.fk_parent_line, cd.fk_product, cd.product_type, cd.description, cd.price, cd.qty, cd.tva_tx, cd.localtax1_tx, cd.localtax2_tx,';
+        $sql = 'SELECT cd.rowid, cd.fk_repair, cd.fk_parent_line, cd.fk_product, cd.product_type, cd.label as custom_label, cd.description, cd.price, cd.qty, cd.tva_tx, cd.localtax1_tx, cd.localtax2_tx,';
         $sql.= ' cd.remise, cd.remise_percent, cd.fk_remise_except, cd.subprice,';
-        $sql.= ' cd.info_bits, cd.total_ht, cd.total_tva, cd.total_localtax1, cd.total_localtax2, cd.total_ttc, cd.marge_tx, cd.marque_tx, cd.rang, cd.special_code,';
+        $sql.= ' cd.info_bits, cd.total_ht, cd.total_tva, cd.total_localtax1, cd.total_localtax2, cd.total_ttc, cd.fk_product_fournisseur_price as fk_fournprice, cd.buy_price_ht as pa_ht, cd.rang, cd.special_code,';
         $sql.= ' p.ref as product_ref, p.label as product_libelle, p.description as product_desc,';
         $sql.= ' cd.date_start, cd.date_end';
         $sql.= ' FROM '.MAIN_DB_PREFIX.'repairdet as cd';
@@ -4575,6 +4593,7 @@ class RepairLine
             $this->rowid            = $objp->rowid;
             $this->fk_repair        = $objp->fk_repair;
             $this->fk_parent_line   = $objp->fk_parent_line;
+            $this->label            = $objp->custom_label;
             $this->desc             = $objp->description;
             $this->qty              = $objp->qty;
             $this->price            = $objp->price;
@@ -4593,8 +4612,11 @@ class RepairLine
             $this->total_localtax1  = $objp->total_localtax1;
             $this->total_localtax2  = $objp->total_localtax2;
             $this->total_ttc        = $objp->total_ttc;
-            $this->marge_tx         = $objp->marge_tx;
-            $this->marque_tx        = $objp->marque_tx;
+			$this->fk_fournprice	= $objp->fk_fournprice;
+			$marginInfos			= getMarginInfos($objp->subprice, $objp->remise_percent, $objp->tva_tx, $objp->localtax1_tx, $objp->localtax2_tx, $this->fk_fournprice, $objp->pa_ht);
+			$this->pa_ht			= $marginInfos[0];
+			$this->marge_tx			= $marginInfos[1];
+			$this->marque_tx		= $marginInfos[2];
             $this->special_code		= $objp->special_code;
             $this->rang             = $objp->rang;
 
@@ -4676,6 +4698,14 @@ class RepairLine
         if (empty($this->special_code)) $this->special_code=0;
         if (empty($this->fk_parent_line)) $this->fk_parent_line=0;
 
+		if (empty($this->pa_ht)) $this->pa_ht=0;
+
+		// si prix d'achat non renseigne et utilise pour calcul des marges alors prix achat = prix vente
+		if ($this->pa_ht == 0) {
+			if ($this->subprice > 0 && (isset($conf->global->ForceBuyingPriceIfNull) && $conf->global->ForceBuyingPriceIfNull == 1))
+				$this->pa_ht = $this->subprice * (1 - $this->remise_percent / 100);
+		}
+
         // Check parameters
         if ($this->product_type < 0) return -1;
 
@@ -4683,45 +4713,40 @@ class RepairLine
 
         // Insertion dans base de la ligne
         $sql = 'INSERT INTO '.MAIN_DB_PREFIX.'repairdet';
-        $sql.= ' (fk_repair, fk_parent_line, description, qty, tva_tx, localtax1_tx, localtax2_tx,';
+        $sql.= ' (fk_repair, fk_parent_line, label, description, qty, tva_tx, localtax1_tx, localtax2_tx,';
         $sql.= ' fk_product, product_type, remise_percent, subprice, price, remise, fk_remise_except,';
-        $sql.= ' special_code, rang, marge_tx, marque_tx,';
+        $sql.= ' special_code, rang, fk_product_fournisseur_price, buy_price_ht,';
         $sql.= ' info_bits, total_ht, total_tva, total_localtax1, total_localtax2, total_ttc, date_start, date_end)';
         $sql.= " VALUES (".$this->fk_repair.",";
         $sql.= " ".($this->fk_parent_line>0?"'".$this->fk_parent_line."'":"null").",";
+        $sql.= " ".(! empty($this->label)?"'".$this->db->escape($this->label)."'":"null").",";
         $sql.= " '".$this->db->escape($this->desc)."',";
         $sql.= " '".price2num($this->qty)."',";
         $sql.= " '".price2num($this->tva_tx)."',";
         $sql.= " '".price2num($this->localtax1_tx)."',";
         $sql.= " '".price2num($this->localtax2_tx)."',";
-        if ($this->fk_product) { $sql.= "'".$this->fk_product."',"; }
-        else { $sql.='null,'; }
+        $sql.= ' '.(! empty($this->fk_product)?$this->fk_product:"null").',';
         $sql.= " '".$this->product_type."',";
         $sql.= " '".price2num($this->remise_percent)."',";
         $sql.= " ".($this->subprice!=''?"'".price2num($this->subprice)."'":"null").",";
         $sql.= " ".($this->price!=''?"'".price2num($this->price)."'":"null").",";
         $sql.= " '".price2num($this->remise)."',";
-        if ($this->fk_remise_except) $sql.= $this->fk_remise_except.",";
-        else $sql.= 'null,';
+        $sql.= ' '.(! empty($this->fk_remise_except)?$this->fk_remise_except:"null").',';
         $sql.= ' '.$this->special_code.',';
         $sql.= ' '.$this->rang.',';
-        if (isset($this->marge_tx)) $sql.= ' '.$this->marge_tx.',';
-        else $sql.= ' null,';
-        if (isset($this->marque_tx)) $sql.= ' '.$this->marque_tx.',';
-        else $sql.= ' null,';
+		$sql.= ' '.(! empty($this->fk_fournprice)?$this->fk_fournprice:"null").',';
+		$sql.= ' '.price2num($this->pa_ht).',';
         $sql.= " '".$this->info_bits."',";
         $sql.= " '".price2num($this->total_ht)."',";
         $sql.= " '".price2num($this->total_tva)."',";
         $sql.= " '".price2num($this->total_localtax1)."',";
         $sql.= " '".price2num($this->total_localtax2)."',";
         $sql.= " '".price2num($this->total_ttc)."',";
-        if ($this->date_start) { $sql.= "'".$this->db->idate($this->date_start)."',"; }
-        else { $sql.='null,'; }
-        if ($this->date_end)   { $sql.= "'".$this->db->idate($this->date_end)."'"; }
-        else { $sql.='null'; }
+        $sql.= " ".(! empty($this->date_start)?"'".$this->db->idate($this->date_start)."'":"null").',';
+        $sql.= " ".(! empty($this->date_end)?"'".$this->db->idate($this->date_end)."'":"null");
         $sql.= ')';
 
-        dol_syslog("RepairLine::insert sql=".$sql);
+        dol_syslog(get_class($this)."::insert sql=".$sql, LOG_DEBUG);
         $resql=$this->db->query($sql);
         if ($resql)
         {
@@ -4730,7 +4755,7 @@ class RepairLine
             if (! $notrigger)
             {
                 // Appel des triggers
-                include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
+                include_once DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php";
                 $interface=new Interfaces($this->db);
                 $result=$interface->run_triggers('LINEORDER_INSERT',$this,$user,$langs,$conf);
                 if ($result < 0) { $error++; $this->errors=$interface->errors; }
@@ -4743,7 +4768,7 @@ class RepairLine
         else
         {
             $this->error=$this->db->error();
-            dol_syslog("RepairLine::insert Error ".$this->error, LOG_ERR);
+            dol_syslog(get_class($this)."::insert Error ".$this->error, LOG_ERR);
             $this->db->rollback();
             return -2;
         }
@@ -4776,12 +4801,20 @@ class RepairLine
         if (empty($this->special_code)) $this->special_code=0;
         if (empty($this->product_type)) $this->product_type=0;
         if (empty($this->fk_parent_line)) $this->fk_parent_line=0;
+		if (empty($this->pa_ht)) $this->pa_ht=0;
 
-        $this->db->begin();
+		// si prix d'achat non renseigné et utilisé pour calcul des marges alors prix achat = prix vente
+		if ($this->pa_ht == 0) {
+			if ($this->subprice > 0 && (isset($conf->global->ForceBuyingPriceIfNull) && $conf->global->ForceBuyingPriceIfNull == 1))
+				$this->pa_ht = $this->subprice * (1 - $this->remise_percent / 100);
+		}
+
+		$this->db->begin();
 
         // Mise a jour ligne en base
         $sql = "UPDATE ".MAIN_DB_PREFIX."repairdet SET";
         $sql.= " description='".$this->db->escape($this->desc)."'";
+		$sql.= " , label=".(! empty($this->label)?"'".$this->db->escape($this->label)."'":"null");
         $sql.= " , tva_tx=".price2num($this->tva_tx);
         $sql.= " , localtax1_tx=".price2num($this->localtax1_tx);
         $sql.= " , localtax2_tx=".price2num($this->localtax2_tx);
@@ -4795,16 +4828,17 @@ class RepairLine
             $sql.= " , total_ht=".price2num($this->total_ht)."";
             $sql.= " , total_tva=".price2num($this->total_tva)."";
             $sql.= " , total_ttc=".price2num($this->total_ttc)."";
+			$sql.= " , total_localtax1=".price2num($this->total_localtax1);
+			$sql.= " , total_localtax2=".price2num($this->total_localtax2);
         }
-        $sql.= " , total_localtax1=".price2num($this->total_localtax1);
-        $sql.= " , total_localtax2=".price2num($this->total_localtax2);
+		$sql.= " , fk_product_fournisseur_price=".(! empty($this->fk_fournprice)?$this->fk_fournprice:"null");
+		$sql.= " , buy_price_ht='".price2num($this->pa_ht)."'";
         $sql.= " , info_bits=".$this->info_bits;
         $sql.= " , special_code=".$this->special_code;
-        if ($this->date_start) { $sql.= " , date_start='".$this->db->idate($this->date_start)."'"; }
-        else { $sql.=' , date_start=null'; }
-        if ($this->date_end) { $sql.= " , date_end='".$this->db->idate($this->date_end)."'"; }
+		$sql.= " , date_start=".(! empty($this->date_start)?"'".$this->db->idate($this->date_start)."'":"null");
+		$sql.= " , date_end=".(! empty($this->date_end)?"'".$this->db->idate($this->date_end)."'":"null");
         $sql.= " , product_type=".$this->product_type;
-        $sql.= " , fk_parent_line=".($this->fk_parent_line>0?$this->fk_parent_line:"null");
+		$sql.= " , fk_parent_line=".(! empty($this->fk_parent_line)?$this->fk_parent_line:"null");
         if (! empty($this->rang)) $sql.= ", rang=".$this->rang;
         $sql.= " WHERE rowid = ".$this->rowid;
 
@@ -4815,7 +4849,7 @@ class RepairLine
             if (! $notrigger)
             {
                 // Appel des triggers
-                include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
+                include_once DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php";
                 $interface=new Interfaces($this->db);
                 $result = $interface->run_triggers('LINEORDER_UPDATE',$this,$user,$langs,$conf);
                 if ($result < 0) { $error++; $this->errors=$interface->errors; }

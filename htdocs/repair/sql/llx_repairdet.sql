@@ -22,13 +22,16 @@
 create table llx_repairdet
 (
   rowid              integer AUTO_INCREMENT PRIMARY KEY,
-  fk_repair        integer	NOT NULL,
+  fk_repair        	 integer	NOT NULL,
   fk_parent_line	 integer	NULL,
   fk_product         integer	NULL,
+  label              varchar(255) DEFAULT NULL,
   description        text,
   tva_tx             double(6,3),	                  -- vat rate
   localtax1_tx       double(6,3),                     -- localtax1 rate
+  localtax1_type 	 varchar(1),
   localtax2_tx       double(6,3),                     -- localtax2 rate
+  localtax2_type 	 varchar(1),
   qty                real,                            -- quantity
   remise_percent     real         DEFAULT 0,          -- pourcentage de remise
   remise             real         DEFAULT 0,          -- montant de la remise
@@ -44,8 +47,8 @@ create table llx_repairdet
   date_start         datetime     DEFAULT NULL,       -- date debut si service
   date_end           datetime     DEFAULT NULL,       -- date fin si service
   info_bits          integer      DEFAULT 0,          -- TVA NPR ou non
-  marge_tx           double(6,3)  DEFAULT 0,          -- taux de marge (marge sur prix d'achat)
-  marque_tx          double(6,3)  DEFAULT 0,          -- taux de marque (marge sur prix de vente)
+  fk_product_fournisseur_price integer,
+  buy_price_ht 		 double(24,8) DEFAULT 0,
   special_code       integer UNSIGNED DEFAULT 0,      -- code pour les lignes speciales
   rang               integer      DEFAULT 0,
   import_key         varchar(14)
