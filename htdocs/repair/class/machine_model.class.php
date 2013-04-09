@@ -591,8 +591,8 @@ class Machine_model // extends CommonObject
 		$sql.= " WHERE mm.rowid";
 		$sql.= " NOT IN (";
     	$sql.= " SELECT m.fk_model";
-		$sql.= " FROM llx_machine AS m";
-//		$sql.= " LEFT JOIN llx_machine_model AS mm ON m.fk_model = mm.rowid";
+		$sql.= " FROM ".MAIN_DB_PREFIX."machine AS m";
+//		$sql.= " LEFT JOIN ".MAIN_DB_PREFIX."machine_model AS mm ON m.fk_model = mm.rowid";
  		$sql.= " )";
 
 //		$this->db->begin();

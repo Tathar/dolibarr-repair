@@ -428,11 +428,11 @@ class Machine_trademark // extends CommonObject
 //TODO
 
 		$sql = "SELECT rowid";
-		$sql.= " FROM llx_machine_trademark";
+		$sql.= " FROM ".MAIN_DB_PREFIX."machine_trademark";
 		$sql.= " WHERE rowid";
 		$sql.= " NOT IN (";
     	$sql.= " SELECT mm.fk_trademark";
-		$sql.= " FROM llx_machine_model AS mm";
+		$sql.= " FROM ".MAIN_DB_PREFIX."machine_model AS mm";
  		$sql.= " )";
 
 //		$this->db->begin();

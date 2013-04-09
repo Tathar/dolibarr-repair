@@ -598,12 +598,12 @@ class Machine // extends CommonObject
 	function clean($user, $notrigger=0)
 	{
 		$sql = "SELECT m.rowid";
-		$sql.= " FROM llx_machine AS m";
+		$sql.= " FROM ".MAIN_DB_PREFIX."machine AS m";
 		$sql.= " WHERE m.rowid";
 		$sql.= " NOT IN (";
     	$sql.= " SELECT r.fk_machine";
-		$sql.= " FROM llx_repair AS r";
-//		$sql.= " LEFT JOIN llx_machine AS m ON r.fk_machine = m.rowid";
+		$sql.= " FROM ".MAIN_DB_PREFIX."repair AS r";
+//		$sql.= " LEFT JOIN ".MAIN_DB_PREFIX."machine AS m ON r.fk_machine = m.rowid";
  		$sql.= " )";
 
 //		$this->db->begin();
