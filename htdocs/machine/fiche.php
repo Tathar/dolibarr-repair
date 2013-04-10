@@ -38,12 +38,12 @@ require_once(DOL_DOCUMENT_ROOT.'/comm/action/class/actioncomm.class.php');
 require_once(DOL_DOCUMENT_ROOT."/core/lib/functions2.lib.php");
 require_once(DOL_DOCUMENT_ROOT."/repair/lib/repair.lib.php");
 require_once(DOL_DOCUMENT_ROOT."/repair/class/html.formrepair.class.php");
-require_once(DOL_DOCUMENT_ROOT."/machine/class/html.formmachine.class.php");
+require_once(DOL_DOCUMENT_ROOT."/repair/class/html.formmachine.class.php");
 if ($conf->projet->enabled) require_once(DOL_DOCUMENT_ROOT.'/projet/class/project.class.php');
 if ($conf->projet->enabled) require_once(DOL_DOCUMENT_ROOT.'/core/lib/project.lib.php');
 if ($conf->propal->enabled) require_once(DOL_DOCUMENT_ROOT.'/comm/propal/class/propal.class.php'); 
 
-if (!$user->rights->repair->lire) accessforbidden();
+if (!$user->rights->repair->read) accessforbidden();
 
 //$langs->load('orders'); //TODO a supprimé
 $langs->load('sendings');

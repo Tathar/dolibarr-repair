@@ -17,10 +17,10 @@
  */
 
 /**
- *  \file       dev/skeletons/machine.class.php
+ *  \file       dev/skeletons/machinemodel.class.php
  *  \ingroup    mymodule othermodule1 othermodule2
  *  \brief      This file is an example for a CRUD class file (Create/Read/Update/Delete)
- *				Initialy built by build_class_from_table on 2013-03-11 20:12
+ *				Initialy built by build_class_from_table on 2013-03-07 21:04
  */
 
 // Put here all includes required by your class file
@@ -28,31 +28,28 @@
 //require_once(DOL_DOCUMENT_ROOT."/societe/class/societe.class.php");
 //require_once(DOL_DOCUMENT_ROOT."/product/class/product.class.php");
 
-require_once(DOL_DOCUMENT_ROOT."/repair/class/machine_model.class.php");
-
+require_once(DOL_DOCUMENT_ROOT."/machine/class/machine_trademark.class.php");
 
 /**
  *	Put here description of your class
  */
-class Machine // extends CommonObject
+class Machine_model // extends CommonObject
 {
 	var $db;							//!< To store db handler
 	var $error;							//!< To return error code (or message)
 	var $errors=array();				//!< To return several error codes (or messages)
-	//var $element='machine';			//!< Id that identify managed objects
-	//var $table_element='machine';	//!< Name of table without prefix where object is stored
+	//var $element='machinemodel';			//!< Id that identify managed objects
+	//var $table_element='machinemodel';	//!< Name of table without prefix where object is stored
 
     var $id;
     
-//	var $fk_model;
+//	var $fk_trademark;
 
 	var $trademark;
 	var $type_id;
 	var $model;
-	var $n_model;					
-	var $serial_num;
-	var $short_ref;
-	var $tms='';
+	var $n_model;
+//	var $tms='';
 
     
 
@@ -82,33 +79,36 @@ class Machine // extends CommonObject
 		$error=0;
 
 		// Clean parameters
-        
-//		if (isset($this->fk_model))   $this->fk_model=trim($this->fk_model);
-		if (isset($this->serial_num)) $this->serial_num=trim($this->serial_num);
-		if (isset($this->short_ref)) $this->short_ref=trim($this->short_ref);
-		if (isset($this->trademark))  $this->trademark=trim($this->trademark);
-		if (isset($this->type_id))      $this->type_id=trim($this->type_id);
-		if (isset($this->model))      $this->model=trim($this->model);
-		if (isset($this->n_model))    $this->n_model=trim($this->n_model);
-        
+		if (isset($this->trademark)) $this->trademark=trim($this->trademark);
+        else 
+		{
+		dol_syslog(get_class($this)."::create trademark is Null", LOG_ERR);
+		return -1;
+		}
+
+//		if (isset($this->fk_trademark)) $this->fk_trademark=trim($this->fk_trademark);
+		if (isset($this->type_id)) $this->type=trim_id($this->type_id);
+		if (isset($this->model)) $this->model=trim($this->model);
+		if (isset($this->n_model)) $this->n_model=trim($this->n_model);
 
 		// Check parameters
 		// Put here code to add control on parameters values
+
+        // Insert request
+
 //<Tathar>
 		dol_syslog(get_class($this)."::create //<Tathar>", LOG_DEBUG);
-		$obj_model = new Machine_model($this->db);
-		$obj_model->trademark = $this->trademark;
-		$obj_model->type_id     = $this->type_id;
-		$obj_model->model     = $this->model;
-		$obj_model->n_model   = $this->n_model;
-		$fk_model = $obj_model->create($user, $notrigger);
+		$obj_trademark = new Machine_trademark($this->db);
+		$obj_trademark->trademark = $this->trademark;
+		$fk_trademark = $obj_trademark->create($user, $notrigger);
 
-		$sql = "SELECT";				//on test si la machine existe deja;
+		$sql = "SELECT";				//on test si le modele existe deja;
 		$sql.= " rowid";
 		
-        $sql.= " FROM ".MAIN_DB_PREFIX."machine";
-        $sql.= ' WHERE fk_model = '.$fk_model.' AND';
-		$sql.= ' serial_num = '."'".$this->serial_num."'";
+        $sql.= " FROM ".MAIN_DB_PREFIX."machine_model";
+        $sql.= " WHERE fk_trademark = ".$fk_trademark." AND";
+		$sql.= " model = '".$this->model."'";
+		$sql.= " AND n_model = "."'".$this->n_model."'";
 
     	dol_syslog(get_class($this)."::create sql=".$sql, LOG_DEBUG);
 
@@ -130,30 +130,33 @@ class Machine // extends CommonObject
             dol_syslog(get_class($this)."::create ".$this->error, LOG_ERR);
             return -1;
         }
-		dol_syslog(get_class($this)."::create //</Tathar> fk_model = ".$fk_model, LOG_DEBUG);
-//</Tathar>									//le modele n'existe pas
-        // Insert request
-		$sql = "INSERT INTO ".MAIN_DB_PREFIX."machine(";
+		dol_syslog(get_class($this)."::create //</Tathar>", LOG_DEBUG);
+//</Tathar>									//le modele n'existe pas, on le crée
+		$sql = "INSERT INTO ".MAIN_DB_PREFIX."machine_model(";		
 		
-		$sql.= "fk_model, ";
-		$sql.= "serial_num, ";
-		$sql.= "short_ref";
-        $sql.= ") VALUES (";
-		$sql.= " "."'".$fk_model."',";
-		$sql.= " "."'".$this->db->escape($this->serial_num)."',";
-		$sql.= " "."'".$this->db->escape($this->short_ref)."'";
-		$sql.= ")";
+		$sql.= "fk_trademark,";
+		$sql.= "type_id,";
+		$sql.= "model,";
+		$sql.= "n_model";
 
+		
+        $sql.= ") VALUES (";
+        
+		$sql.= " ".(! isset($fk_trademark)?'NULL':"'".$fk_trademark."'").",";
+		$sql.= " ".(! isset($this->type_id)?'NULL':"'".$this->db->escape($this->type_id)."'").",";
+		$sql.= " ".(! isset($this->model)?'NULL':"'".$this->db->escape($this->model)."'").",";
+		$sql.= " ".(! isset($this->n_model)?'NULL':"'".$this->db->escape($this->n_model)."'");
+
+		$sql.= ")";
+		dol_syslog(get_class($this)."::create sql=".$sql, LOG_DEBUG);
 		$this->db->begin();
 
-	   	dol_syslog(get_class($this)."::create sql=".$sql, LOG_DEBUG);
         $resql=$this->db->query($sql);
     	if (! $resql) { $error++; $this->errors[]="Error ".$this->db->lasterror(); }
 
 		if (! $error)
         {
-            $this->id = $this->db->last_insert_id(MAIN_DB_PREFIX."machine");
-
+            $this->id = $this->db->last_insert_id(MAIN_DB_PREFIX."machine_model");
 			if (! $notrigger)
 			{
 	            // Uncomment this and change MYOBJECT to your own tag if you
@@ -195,22 +198,23 @@ class Machine // extends CommonObject
      */
     function fetch($id)
     {
-    	global $langs;
+
+		global $langs;
         $sql = "SELECT";
 		$sql.= " m.rowid,";
-		$sql.= " m.serial_num,";
-		$sql.= " m.short_ref,";
-		$sql.= " m.tms,";
-
-		$sql.= " mm.type_id,";
-		$sql.= " mm.model,";
-		$sql.= " mm.n_model,";
-
-		$sql.= " mt.trademark";
 		
-        $sql.= " FROM ".MAIN_DB_PREFIX."machine as m";
-		$sql.= " LEFT JOIN ".MAIN_DB_PREFIX."machine_model as mm ON m.fk_model = mm.rowid";
-		$sql.= " LEFT JOIN ".MAIN_DB_PREFIX."machine_trademark as mt ON mm.fk_trademark = mt.rowid";
+//		$sql.= " m.fk_trademark,";
+		$sql.= " m.type_id,";
+		$sql.= " m.model,";
+		$sql.= " m.n_model,";
+		$sql.= " m.tms";
+
+		$sql.= " t.trademark";
+
+		
+        $sql.= " FROM ".MAIN_DB_PREFIX."machine_model as m";
+		$sql.= " LEFT JOIN ".MAIN_DB_PREFIX."machine_trademark as t";
+		$sql.= " ON m.fk_trademark = t.rowid";
         $sql.= " WHERE m.rowid = ".$id;
 
     	dol_syslog(get_class($this)."::fetch sql=".$sql, LOG_DEBUG);
@@ -221,14 +225,13 @@ class Machine // extends CommonObject
             {
                 $obj = $this->db->fetch_object($resql);
 
-                $this->id    	  = $obj->rowid;
-				$this->serial_num = $obj->serial_num;
-				$this->short_ref = $obj->short_ref;
-				$this->tms 		  = $this->db->jdate($obj->tms);
-				$this->type_id 	  = $obj->type_id;
-				$this->model 	  = $obj->model;
-				$this->n_model 	  = $obj->n_model;
-				$this->trademark  = $obj->trademark;
+                $this->id    = $obj->rowid;
+                
+				$this->trademark = $obj->trademark;
+				$this->type_id = $obj->type_id;
+				$this->model = $obj->model;
+				$this->n_model = $obj->n_model;
+				$this->tms = $this->db->jdate($obj->tms);
 
                 
             }
@@ -259,34 +262,25 @@ class Machine // extends CommonObject
 
 		// Clean parameters
         
-		if (isset($this->serial_num)) $this->serial_num = trim($this->serial_num);
-		if (isset($this->short_ref)) $this->short_ref = trim($this->short_ref);
-		if (isset($this->trademark))  $this->trademark  = trim($this->trademark);
-		if (isset($this->type_id))      $this->type_id		= trim($this->type_id);
-		if (isset($this->model))      $this->model		= trim($this->model);
-		if (isset($this->n_model))    $this->n_model	= trim($this->n_model);
+		if (isset($this->trademark)) $this->trademark=trim($this->trademark);
+		if (isset($this->type_id)) $this->type_id=trim($this->type_id);
+		if (isset($this->model)) $this->model=trim($this->model);
+		if (isset($this->n_model)) $this->n_model=trim($this->n_model);
 
         
 
 		// Check parameters
 		// Put here code to add control on parameters values
-//<Tathar>
-		$obj_model = new Machine_model($this->db);
-		$obj_model->trademark = $this->trademark;
-		$obj_model->type_id 	  = $this->type_id;
-		$obj_model->model 	  = $this->model;
-		$obj_model->n_model   = $this->n_model;
+		$fk_trademark = $this->trademarkID($trademark);
 		
-		$fk_model = $obj_model->create($user);
-//</Tathar>
-
         // Update request
-        $sql = "UPDATE ".MAIN_DB_PREFIX."machine SET";
+        $sql = "UPDATE ".MAIN_DB_PREFIX."machine_model SET";
         
-		$sql.= " fk_model=".(isset($this->fk_model)?$this->fk_model:"null").",";
-		$sql.= " serial_num=".(isset($this->serial_num)?"'".$this->db->escape($this->serial_num)."'":"null").",";
-		$sql.= " short_ref=".(isset($this->short_ref)?"'".$this->db->escape($this->short_ref)."'":"null").",";
-		$sql.= " tms=".(dol_strlen($this->tms)!=0 ? "'".$this->db->idate($this->tms)."'" : 'null')."";
+		$sql.= " fk_trademark=".(isset($fk_trademark)?$this->fk_trademark:"").",";
+		$sql.= " type_id=".(isset($this->type_id)?"'".$this->db->escape($this->type_id)."'":"").",";
+		$sql.= " model=".(isset($this->model)?"'".$this->db->escape($this->model)."'":"").",";
+		$sql.= " n_model=".(isset($this->n_model)?"'".$this->db->escape($this->n_model)."'":"");
+//		$sql.= " tms=".(dol_strlen($this->tms)!=0 ? "'".$this->db->idate($this->tms)."'" : 'null');
 
         
         $sql.= " WHERE rowid=".$this->id;
@@ -327,7 +321,7 @@ class Machine // extends CommonObject
 		else
 		{
 			$this->db->commit();
-			$obj_model->clean($user, $notrigger);
+			$this->clean($user, $notrigger);
 			return 1;
 		}
     }
@@ -365,12 +359,12 @@ class Machine // extends CommonObject
 
 		if (! $error)
 		{
-    		$sql = "DELETE FROM ".MAIN_DB_PREFIX."machine";
+    		$sql = "DELETE FROM ".MAIN_DB_PREFIX."machine_model";
     		$sql.= " WHERE rowid=".$this->id;
 
     		dol_syslog(get_class($this)."::delete sql=".$sql);
     		$resql = $this->db->query($sql);
-        	if (! $resql) { $error++; $this->errors[]="Error ".$this->db->lasterror();}
+        	if (! $resql) { $error++; $this->errors[]="Error ".$this->db->lasterror(); }
 		}
 
         // Commit or rollback
@@ -387,8 +381,8 @@ class Machine // extends CommonObject
 		else
 		{
 			$this->db->commit();
-			$obj_model = new Machine_model($this->db);
-			$obj_model->clean($user, $notrigger);
+			$objtred = new Machine_trademark($this->db);
+			$objtred->clean($user, $notrigger);
 			return 1;
 		}
 	}
@@ -407,17 +401,18 @@ class Machine // extends CommonObject
 
 		$error=0;
 
-		$object=new Machine($this->db);
+		$object=new Machine_model($this->db);
 
 		$this->db->begin();
 
 		// Load source object
 		$object->fetch($fromid);
 		$object->id=0;
-		$object->statut=0;
+//		$object->statut=0;
 
 		// Clear fields
 		// ...
+//		$object->tms='';
 
 		// Create clone
 		$result=$object->create($user);
@@ -463,168 +458,157 @@ class Machine // extends CommonObject
 		$this->type_id='FAX';
 		$this->model='FAX 8360P';
 		$this->n_model='N/A';
-		$this->serial_num='1234567890';
-		$this->short_ref='890';
 		$this->tms='';
 
 		
 	}
 
+//Tathar
+
 	/**
-	 *	Initialise object with example values
-	 *	Id must be 0 if object instance is a specimen
-	 *
-	 *	@return	void
+	 *	Get trademark rowid
+	 *	
+	 *	@return	rowid or 0 if not exist
 	 */
-	function setType_id( $id,$type_id )
-	{		
-		       // Update request
-        $sql = "SELECT";
-		$sql.= " mm.rowid as rowid";
-        $sql.= " FROM ".MAIN_DB_PREFIX."machine as m";
-		$sql.= " LEFT JOIN ".MAIN_DB_PREFIX."machine_model as mm ON m.fk_model = mm.rowid";
-        $sql.= " WHERE m.rowid = ".$id;
-
-    	dol_syslog(get_class($this)."::setType sql=".$sql, LOG_DEBUG);
-        $resql=$this->db->query($sql);
-    	if ($resql)
+	function trademarkID($var)
+	{
+		if (! isset($var)) 
 		{
-			$return = 0;
-            if ($this->db->num_rows($resql))
-            {
-                $obj = $this->db->fetch_object($resql);
-
-				$objmm = new Machine_model($this->db);
-				$return =  $objmm->setType_id($obj->rowid, $type_id);
-				if ($return == 1 ) $this->type_id= $type_id;
-            }
-            $this->db->free($resql);
-
-            return $return;
-        }
-        else
+			dol_syslog(get_class($this)."::trademarkID var is null", LOG_ERR);
+	   		return -1;
+		}
+ 
+		$sql = "SELECT rowid";									//on verifie si la "marque" existe
+		$sql.= " FROM ".MAIN_DB_PREFIX."machine_trademark";
+		$sql.= " WHERE trademark = ".$var; 
+//		$this->db->begin();
+		dol_syslog(get_class($this)."::trademarkID sql=".$sql, LOG_DEBUG);
+		$result=$this->db->query($sql);
+    	if (! $result) { $error++; $this->errors[]="Error ".$this->db->lasterror(); }
+		if ( $result)
         {
-      	    $this->error="Error ".$this->db->lasterror();
-            dol_syslog(get_class($this)."::fetch ".$this->error, LOG_ERR);
-            return -1;
+			if ($this->db->num_rows($result))	//la "Marque" existe
+            {
+				$obj = $this->db->fetch_object($result);
+                $fk_trademark = $obj->rowid;
+			}
+			else								//la "Marque" n'existe pas
+			{
+				$fk_trademark = 0;
+			}
+			$this->db->free($result);
+			return $fk_trademark;
+		}
+		else
+        {
+            dol_print_error($this->db);
+			return -1;
         }
-		
 	}
+
 
 	/**
-	 *	Initialise object with example values
-	 *	Id must be 0 if object instance is a specimen
-	 *
-	 *	@return	void
+	 *	Create trademark and return rowid
+	 *	
+	 *	@return	rowid or 0 if not exist
 	 */
-	function setSerialNum( $id, $serial_num )
+	function createTrademark($var)
 	{
-		
-		       // Update request
-        $sql = "UPDATE ".MAIN_DB_PREFIX."machine SET";
-        
-		$sql.= ' serial_num='."'".$serial_num."'";
-
-        $sql.= " WHERE rowid=".$id;
-
-		$this->db->begin();
-
-		dol_syslog(get_class($this)."::setSerialNum sql=".$sql, LOG_DEBUG);
-        $resql = $this->db->query($sql);
-    	if (! $resql) { $error++; $this->errors[]="Error ".$this->db->lasterror();}
-
-        // Commit or rollback
-		if ($error)
+		if (! isset($var)) 
 		{
-			foreach($this->errors as $errmsg)
-			{
-	            dol_syslog(get_class($this)."::setSerialNum ".$errmsg, LOG_ERR);
-	            $this->error.=($this->error?', '.$errmsg:$errmsg);
+			dol_syslog(get_class($this)."::createTrademark var is null", LOG_ERR);
+	   		return -1;
+		}
+ 
+		$sql = 'SELECT rowid';									//on verifie si la "marque" existe deja
+		$sql.= ' FROM '.MAIN_DB_PREFIX.'machine_trademark';
+		$sql.= " WHERE trademark='".$var."'"; 
+//		$this->db->begin();
+		dol_syslog(get_class($this)."::createTrademark sql=".$sql, LOG_DEBUG);
+		$result = $this->db->query($sql);
+    	if (! $result) { $error++; $this->errors[]="Error ".$this->db->lasterror(); }
+		if ( $result)
+        {
+			if ($this->db->num_rows($result))	//la "Marque" existe deja
+            {
+				$obj = $this->db->fetch_object($result);
+                $fk_trademark = $obj->rowid;
 			}
-			$this->db->rollback();
-			return -1*$error;
+			else								//la "Marque" n'existe pas, on l'ajoute a la table
+			{
+				$sql = "INSERT INTO ".MAIN_DB_PREFIX."machine_trademark(";
+				$sql.= "trademark";
+       			$sql.= ") VALUES (";
+				$sql.= " "."'".$var."'";
+				$sql.= ")";
+
+//				$this->db->begin();
+
+			   	dol_syslog(get_class($this)."::createTrademark sql=".$sql, LOG_DEBUG);
+        		$resql=$this->db->query($sql);
+    			if (! $resql) { $error++; $this->errors[]="Error ".$this->db->lasterror(); }
+				if ($error)
+				{
+					foreach($this->errors as $errmsg)
+					{
+	    		        dol_syslog(get_class($this)."::createTrademark ".$errmsg, LOG_ERR);
+	    		        $this->error.=($this->error?', '.$errmsg:$errmsg);
+					}
+					$this->db->rollback();
+					return -1*$error;
+				}
+				else
+				{
+					$fk_trademark = $this->db->last_insert_id(MAIN_DB_PREFIX.'machine_trademark');
+					$this->db->commit();
+				}
+			}
+
+			$this->db->free($result);
+			return $fk_trademark;
 		}
 		else
-		{
-			$this->db->commit();
-			return 1;
-		}
-
-		
+        {
+            dol_print_error($this->db);
+			return -1;
+        }
 	}
+
 
 	/**
-	 *	Initialise object with example values
-	 *	Id must be 0 if object instance is a specimen
+	 *  Clean model database
 	 *
-	 *	@return	void
+     *	@param  User	$user        User that delete
+     *  @param  int		$notrigger	 0=launch triggers after, 1=disable triggers
+	 *  @return	int					 <0 if KO, number of delete line
 	 */
-	function setShortRef( $id, $short_ref )
-	{
-		
-		       // Update request
-        $sql = "UPDATE ".MAIN_DB_PREFIX."machine SET";
-        
-		$sql.= ' short_ref='."'".$short_ref."'";
-
-        $sql.= " WHERE rowid=".$id;
-
-		$this->db->begin();
-
-		dol_syslog(get_class($this)."::setShortRef sql=".$sql, LOG_DEBUG);
-        $resql = $this->db->query($sql);
-    	if (! $resql) { $error++; $this->errors[]="Error ".$this->db->lasterror();}
-
-        // Commit or rollback
-		if ($error)
-		{
-			foreach($this->errors as $errmsg)
-			{
-	            dol_syslog(get_class($this)."::setShortRef ".$errmsg, LOG_ERR);
-	            $this->error.=($this->error?', '.$errmsg:$errmsg);
-			}
-			$this->db->rollback();
-			return -1*$error;
-		}
-		else
-		{
-			$this->db->commit();
-			return 1;
-		}
-
-		
-	}
-
 	function clean($user, $notrigger=0)
 	{
-		$sql = "SELECT m.rowid";
-		$sql.= " FROM ".MAIN_DB_PREFIX."machine AS m";
-		$sql.= " WHERE m.rowid";
+//TODO
+
+		$sql = "SELECT mm.rowid";
+		$sql.= " FROM ".MAIN_DB_PREFIX."machine_model AS mm";
+		$sql.= " WHERE mm.rowid";
 		$sql.= " NOT IN (";
-    	$sql.= " SELECT r.fk_machine";
-		$sql.= " FROM ".MAIN_DB_PREFIX."repair AS r";
-//		$sql.= " LEFT JOIN ".MAIN_DB_PREFIX."machine AS m ON r.fk_machine = m.rowid";
+    	$sql.= " SELECT m.fk_model";
+		$sql.= " FROM ".MAIN_DB_PREFIX."machine AS m";
+//		$sql.= " LEFT JOIN ".MAIN_DB_PREFIX."machine_model AS mm ON m.fk_model = mm.rowid";
  		$sql.= " )";
 
 //		$this->db->begin();
-		dol_syslog(get_class($this)."::clean sql=".$sql, LOG_DEBUG);
+		dol_syslog(get_class($this)."::cleanModel sql=".$sql, LOG_DEBUG);
 		$result=$this->db->query($sql);
 		if ( $result)
         { 
 			$num = $this->db->num_rows($result);
 			$id = $this->id;
-			dol_syslog(get_class($this)."::clean num_rows = $num" , LOG_DEBUG);
+			dol_syslog(get_class($this)."::cleanModel num_rows = $num" , LOG_DEBUG);
 			while ($obj=$this->db->fetch_object($resql))
             {
 				$this->id = $obj->rowid;
-				dol_syslog(get_class($this)."::clean delete row = $this->id" , LOG_DEBUG);
+				dol_syslog(get_class($this)."::cleanModel delete row = $this->id" , LOG_DEBUG);
 				$this->delete( $user, $notrigger);
-dol_syslog(get_class($this)."::clean delete row = $this->id" , LOG_DEBUG);
             }
-
-//			$objmod = new Machine_model($this->db);
-//			dol_syslog(get_class($this)."::clean", LOG_DEBUG);
-//			$objmod->cleanModel($user, $notrigger);
 			return $num;
 		}
 		else
@@ -633,7 +617,48 @@ dol_syslog(get_class($this)."::clean delete row = $this->id" , LOG_DEBUG);
             $this->error=$this->db->error();
             return -1;
         }
+	}
 
+	/**
+	 *	Initialise object with example values
+	 *	Id must be 0 if object instance is a specimen
+	 *
+	 *	@return	void
+	 */
+	function setType_id( $id, $type_id )
+	{
+		
+		       // Update request
+        $sql = "UPDATE ".MAIN_DB_PREFIX."machine_model SET";
+        
+		$sql.= ' type_id='."'".$type_id."'";
+
+        $sql.= " WHERE rowid=".$id;
+
+		$this->db->begin();
+
+		dol_syslog(get_class($this)."::setType_id sql=".$sql, LOG_DEBUG);
+        $resql = $this->db->query($sql);
+    	if (! $resql) { $error++; $this->errors[]="Error ".$this->db->lasterror();}
+
+        // Commit or rollback
+		if ($error)
+		{
+			foreach($this->errors as $errmsg)
+			{
+	            dol_syslog(get_class($this)."::setType_id ".$errmsg, LOG_ERR);
+	            $this->error.=($this->error?', '.$errmsg:$errmsg);
+			}
+			$this->db->rollback();
+			return -1*$error;
+		}
+		else
+		{
+			$this->db->commit();
+			return 1;
+		}
+
+		
 	}
 
 }

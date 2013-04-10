@@ -23,20 +23,20 @@
  */
 
 /**
- *		\defgroup   repair     Module orders
- *		\brief      Module pour gerer le suivi des repairs
- *		\file       htdocs/repair/core/modules/modRepair.class.php
- *		\ingroup    repair
- *		\brief      Fichier de description et activation du module Repair
+ *		\defgroup   machine     Module orders
+ *		\brief      Module pour gerer le suivi des machines
+ *		\file       htdocs/machine/core/modules/modMachine.class.php
+ *		\ingroup    machine
+ *		\brief      Fichier de description et activation du module Machine
  */
 
 include_once(DOL_DOCUMENT_ROOT ."/core/modules/DolibarrModules.class.php");
 
 
 /**
- *	Classe de description et activation du module Repair
+ *	Classe de description et activation du module Machine
  */
-class modRepair extends DolibarrModules
+class modMachine extends DolibarrModules
 {
 
 	/**
@@ -44,179 +44,163 @@ class modRepair extends DolibarrModules
 	 *
 	 *   @param      DoliDB		$db      Database handler
 	 */
-	function modRepair($db)
+	function modMachine($db)
 	{
 		global $conf;
 
 		$this->db = $db;
-		$this->numero = 12500;
+		$this->numero = 12400;
 
 		$this->family = "crm";
 		// Module label (no space allowed), used if translation string 'ModuleXXXName' not found (where XXX is value of numeric property 'numero' of module)
 		$this->name = preg_replace('/^mod/i','',get_class($this));
-		$this->description = "Gestion des réparations clients";
+		$this->description = "Gestion des machines";
 		// Possible values for version are: 'development', 'experimental', 'dolibarr' or version
 		$this->version = '0.1';
 
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->special = 0;
-		$this->picto='repair@repair';
+		$this->picto='machine@machine';
 
 		// Data directories to create when module is enabled
-		$this->dirs = array("/repair/temp");
+		$this->dirs = array("/machine/temp");
 
 		// Config pages
-		$this->config_page_url = array("repair.php@repair");
+//		$this->config_page_url = array("machine.php@machine");
 
 		// Dependancies
-		$this->depends = array("modSociete","modMachine");
+		$this->depends = array("modSociete");
 //		$this->requiredby = array("modExpedition");
-		$this->requiredby = array();
+		$this->requiredby = array("modRepair");
 		$this->conflictwith = array();
-		$this->langfiles = array("bills","companies","products","repairlang@repair");
+		$this->langfiles = array("bills","companies","products","machine@machine");
 
 		// Constantes
 		$this->const = array();
 		$r=0;
 
-		$this->const[$r][0] = "REPAIR_ADDON_PDF";
-		$this->const[$r][1] = "chaine";
-		$this->const[$r][2] = "squeeze";
-		$this->const[$r][3] = 'Nom du gestionnaire de generation des reparations en PDF';
-		$this->const[$r][4] = 0;
-
-		$r++;
-		$this->const[$r][0] = "REPAIR_ADDON";
-		$this->const[$r][1] = "chaine";
-		$this->const[$r][2] = "mod_repair_marbre";
-		$this->const[$r][3] = 'Nom du gestionnaire de numerotation des reparations';
-		$this->const[$r][4] = 0;
-
-		$r++;
-		$this->const[$r][0] = "REPAIR_ADDON_PDF_ODT_PATH";
-		$this->const[$r][1] = "chaine";
-		$this->const[$r][2] = "DOL_DATA_ROOT/doctemplates/repair";
-		$this->const[$r][3] = "Nom du gestionnaire de generation des fiche reparations en PDF";
-		$this->const[$r][4] = 0;
-
-		$r++;
-		$this->const[$r][0] = "REPAIR_ADDON_PDF_CARD";
-		$this->const[$r][1] = "chaine";
-		$this->const[$r][2] = "RepairLabel";
-		$this->const[$r][3] = "";
-		$this->const[$r][4] = 0;
-
-		$r++;
-		$this->const[$r][0] = "MAIN_DELAY_REPAIRS_TO_PROCESS";
-		$this->const[$r][1] = "chaine";
-		$this->const[$r][2] = "7";
-		$this->const[$r][3] = "";
-		$this->const[$r][4] = 0;
-/*
-		$r++;
-		$this->const[$r][0] = "MAIN_MODULE_CARDS_MODELS";
-		$this->const[$r][1] = "chaine";
-		$this->const[$r][2] = "1";
-		$this->const[$r][3] = "";
-		$this->const[$r][4] = 0;
-*/
-		
-		// Boites
-		$this->boxes = array();
-		$this->boxes[0][1] = "box_repair.php";
+		//Tabs ajout d'onglet dans les fiche client, produit, etc
+		$this->tabs = array('thirdparty:+machine:Machine:@machine:$user->rights->machine->read:/machine/thirdparty.php?id=__ID__');
 
 		// Permissions
 		$this->rights = array();
-		$this->rights_class = 'repair';
+		$this->rights_class = 'machine';
 
 		$r=0;
-
+/*
 		$r++;
-		$this->rights[$r][0] = 12501;
-		$this->rights[$r][1] = 'Lire les réparations';
+		$this->rights[$r][0] = 12401;
+		$this->rights[$r][1] = 'Lire les machines';
 		$this->rights[$r][2] = 'r';
 		$this->rights[$r][3] = 1;
 		$this->rights[$r][4] = 'lire';
-
-
+*/
 		$r++;
-		$this->rights[$r][0] = 12502;
-		$this->rights[$r][1] = 'Créer les réparations';
+		$this->rights[$r][0] = 12401;
+		$this->rights[$r][1] = 'Lire les machines';
+		$this->rights[$r][2] = 'r';
+		$this->rights[$r][3] = 1;
+		$this->rights[$r][4] = 'read';
+/*
+		$r++;
+		$this->rights[$r][0] = 12402;
+		$this->rights[$r][1] = 'Créer les machines';
+		$this->rights[$r][2] = 'w';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'creer';
+*/
+		$r++;
+		$this->rights[$r][0] = 12402;
+		$this->rights[$r][1] = 'Créer les machines';
 		$this->rights[$r][2] = 'w';
 		$this->rights[$r][3] = 0;
 		$this->rights[$r][4] = 'create';
 
 		$r++;
-		$this->rights[$r][0] = 12504;
-		$this->rights[$r][1] = 'Valider les devis de réparations';
+		$this->rights[$r][0] = 12408;
+		$this->rights[$r][1] = 'Envoyer les machines';
 		$this->rights[$r][2] = 'd';
 		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'ValidateEstimate';
-
-		$r++;
-		$this->rights[$r][0] = 12505;
-		$this->rights[$r][1] = 'Valider les réponses clients';
-		$this->rights[$r][2] = 'd';
-		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'ValidateReplies';
-
-		$r++;
-		$this->rights[$r][0] = 12506;
-		$this->rights[$r][1] = 'Effectuer les réparations';
-		$this->rights[$r][2] = 'w';
-		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'MakeRepair';
-
-		$r++;
-		$this->rights[$r][0] = 12507;
-		$this->rights[$r][1] = 'Valider les réparations';
-		$this->rights[$r][2] = 'd';
-		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'ValidateRepair';
-
-		$r++;
-		$this->rights[$r][0] = 12508;
-		$this->rights[$r][1] = 'Envoyer les réparations';
-		$this->rights[$r][2] = 'd';
-		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'repair_advance';
+		$this->rights[$r][4] = 'machine_advance';
         $this->rights[$r][5] = 'send';
 
 		$r++;
-		$this->rights[$r][0] = 12509;
-		$this->rights[$r][1] = 'Cloturer les réparations';
+		$this->rights[$r][0] = 12409;
+		$this->rights[$r][1] = 'Cloturer les machines';
 		$this->rights[$r][2] = 'd';
 		$this->rights[$r][3] = 0;
 		$this->rights[$r][4] = 'cloturer';
 
 		$r++;
-		$this->rights[$r][0] = 125010;
-		$this->rights[$r][1] = 'Annuler les réparations';
+		$this->rights[$r][0] = 124010;
+		$this->rights[$r][1] = 'Annuler les machines';
 		$this->rights[$r][2] = 'd';
 		$this->rights[$r][3] = 0;
 		$this->rights[$r][4] = 'annuler';
 
 		$r++;
-		$this->rights[$r][0] = 12511;
-		$this->rights[$r][1] = 'Supprimer les réparations';
+		$this->rights[$r][0] = 124010;
+		$this->rights[$r][1] = 'Annuler les machines';
+		$this->rights[$r][2] = 'd';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'cancel';
+
+		$r++;
+		$this->rights[$r][0] = 12411;
+		$this->rights[$r][1] = 'Supprimer les machines';
 		$this->rights[$r][2] = 'd';
 		$this->rights[$r][3] = 0;
 		$this->rights[$r][4] = 'supprimer';
 
 		$r++;
-		$this->rights[$r][0] = 12512;
-		$this->rights[$r][1] = 'Exporter les réparations et attributs';
+		$this->rights[$r][0] = 12411;
+		$this->rights[$r][1] = 'Supprimer les machines';
+		$this->rights[$r][2] = 'd';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'delete';
+
+		$r++;
+		$this->rights[$r][0] = 12412;
+		$this->rights[$r][1] = 'Exporter les machines et attributs';
 		$this->rights[$r][2] = 'r';
 		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'repair';
+		$this->rights[$r][4] = 'machine';
 		$this->rights[$r][5] = 'export';
+
 
 //tathar
 		//Menus ajout des menus gauche et superieur
 
 		// Main menu entries
 		$this->menu = array();			// List of menus to add
-/*		$r=0;
+		$r=0;
+
+		$this->menu[$r]=array('fk_menu'=>0,
+													'type'=>'top',
+													'titre'=>'Machines',
+													'mainmenu'=>'machine',
+													'url'=>'/machine/index.php?leftmenu=machine',
+													'langs'=>'machine@machine',
+													'position'=>100,
+													'perms'=>'$user->rights->machine->read',
+													'enabled'=>'$conf->machine->enabled',
+													'target'=>'',
+													'user'=>2);
+		$r++;
+		$this->menu[$r]=array('fk_menu'=>'r=0',
+													'type'=>'left',
+													'titre'=>'Machines',
+													'mainmenu'=>'machine',
+													'url'=>'/machine/index.php?leftmenu=machine',
+													'langs'=>'machine@machine',
+													'position'=>100,
+													'perms'=>'$user->rights->machine->read',
+													'enabled'=>'$conf->machine->enabled',
+													'target'=>'',
+													'user'=>2);
+		$r++;
+
+//for repair
 		$this->menu[$r]=array('fk_menu'=>'r=0',
 													'type'=>'left',
 													'titre'=>'Repairs',
@@ -229,7 +213,7 @@ class modRepair extends DolibarrModules
 													'target'=>'',
 													'user'=>2);
 		$r++;
-		$this->menu[$r]=array('fk_menu'=>'r=1',
+		$this->menu[$r]=array('fk_menu'=>'r=2',
 													'type'=>'left',
 													'titre'=>'NewRepair',
 													'mainmenu'=>'machine',
@@ -242,7 +226,7 @@ class modRepair extends DolibarrModules
 													'user'=>2);
 		$r++;
 
-		$this->menu[$r]=array('fk_menu'=>'r=1',
+		$this->menu[$r]=array('fk_menu'=>'r=2',
 													'type'=>'left',
 													'titre'=>'List',
 													'mainmenu'=>'machine',
@@ -255,7 +239,7 @@ class modRepair extends DolibarrModules
 													'user'=>2);
 		$r++;
 
-		$this->menu[$r]=array('fk_menu'=>'r=3',
+		$this->menu[$r]=array('fk_menu'=>'r=4',
 													'type'=>'left',
 													'titre'=>'StatusRepairWaitingEstimate',
 													'mainmenu'=>'machine',
@@ -268,7 +252,7 @@ class modRepair extends DolibarrModules
 													'user'=>2);
 		$r++;
 
-		$this->menu[$r]=array('fk_menu'=>'r=3',
+		$this->menu[$r]=array('fk_menu'=>'r=4',
 													'type'=>'left',
 													'titre'=>'StatusRepairEstimatesDuring',
 													'mainmenu'=>'machine',
@@ -281,7 +265,7 @@ class modRepair extends DolibarrModules
 													'user'=>2);
 		$r++;
 //
-		$this->menu[$r]=array('fk_menu'=>'r=3',
+		$this->menu[$r]=array('fk_menu'=>'r=4',
 													'type'=>'left',
 													'titre'=>'StatusRepairEstimatesComplete',
 													'mainmenu'=>'machine',
@@ -294,7 +278,7 @@ class modRepair extends DolibarrModules
 													'user'=>2);
 		$r++;
 
-		$this->menu[$r]=array('fk_menu'=>'r=3',
+		$this->menu[$r]=array('fk_menu'=>'r=4',
 													'type'=>'left',
 													'titre'=>'StatusRepairEstimatesValidate',
 													'mainmenu'=>'machine',
@@ -307,7 +291,7 @@ class modRepair extends DolibarrModules
 													'user'=>2);
 		$r++;
 //
-		$this->menu[$r]=array('fk_menu'=>'r=3',
+		$this->menu[$r]=array('fk_menu'=>'r=4',
 													'type'=>'left',
 													'titre'=>'StatusRepairAcceptedEstimate',
 													'mainmenu'=>'machine',
@@ -320,7 +304,7 @@ class modRepair extends DolibarrModules
 													'user'=>2);
 		$r++;
 
-		$this->menu[$r]=array('fk_menu'=>'r=3',
+		$this->menu[$r]=array('fk_menu'=>'r=4',
 													'type'=>'left',
 													'titre'=>'StatusRepairInProgress',
 													'mainmenu'=>'machine',
@@ -333,7 +317,7 @@ class modRepair extends DolibarrModules
 													'user'=>2);
 		$r++;
 
-		$this->menu[$r]=array('fk_menu'=>'r=3',
+		$this->menu[$r]=array('fk_menu'=>'r=4',
 													'type'=>'left',
 													'titre'=>'StatusRepairComplete',
 													'mainmenu'=>'machine',
@@ -346,7 +330,7 @@ class modRepair extends DolibarrModules
 													'user'=>2);
 		$r++;
 
-		$this->menu[$r]=array('fk_menu'=>'r=3',
+		$this->menu[$r]=array('fk_menu'=>'r=4',
 													'type'=>'left',
 													'titre'=>'StatusRepairValidate',
 													'mainmenu'=>'machine',
@@ -359,7 +343,7 @@ class modRepair extends DolibarrModules
 													'user'=>2);
 		$r++;
 
-		$this->menu[$r]=array('fk_menu'=>'r=3',
+		$this->menu[$r]=array('fk_menu'=>'r=4',
 													'type'=>'left',
 													'titre'=>'StatusRepairToBill',
 													'mainmenu'=>'machine',
@@ -372,7 +356,7 @@ class modRepair extends DolibarrModules
 													'user'=>2);
 		$r++;
 
-		$this->menu[$r]=array('fk_menu'=>'r=3',
+		$this->menu[$r]=array('fk_menu'=>'r=4',
 													'type'=>'left',
 													'titre'=>'StatusRepairProcessed',
 													'mainmenu'=>'machine',
@@ -385,7 +369,7 @@ class modRepair extends DolibarrModules
 													'user'=>2);
 		$r++;
 
-		$this->menu[$r]=array('fk_menu'=>'r=3',
+		$this->menu[$r]=array('fk_menu'=>'r=4',
 													'type'=>'left',
 													'titre'=>'StatusRepairCanceled',
 													'mainmenu'=>'machine',
@@ -398,7 +382,7 @@ class modRepair extends DolibarrModules
 													'user'=>2);
 		$r++;
 
-		$this->menu[$r]=array('fk_menu'=>'r=1',
+		$this->menu[$r]=array('fk_menu'=>'r=2',
 													'type'=>'left',
 													'titre'=>'Statistics',
 													'mainmenu'=>'machine',
@@ -410,20 +394,22 @@ class modRepair extends DolibarrModules
 													'target'=>'',
 													'user'=>2);
 		$r++;
-*/
+
+
+
         // Dictionnaries
-        if (! isset($conf->repair->enabled)) $conf->repair->enabled=0;		// This is to avoid warnings
+        if (! isset($conf->machine->enabled)) $conf->machine->enabled=0;		// This is to avoid warnings
         $this->dictionnaries=array(
-            'langs'=>'repair@repairlang',
-            'tabname'=>array(MAIN_DB_PREFIX."c_repair_support"),			// List of tables we want to see into dictonnary editor
-            'tablib'=>array("Repair Support"),								// Label of tables
-            'tabsql'=>array('SELECT f.rowid as rowid, f.code, f.label, f.active FROM '.MAIN_DB_PREFIX.'c_repair_support as f'),			// Request to select fields
-            'tabsqlsort'=>array("label ASC"),								// Sort order
-            'tabfield'=>array("code,label"),								// List of fields (result of select to show dictionnary)
-            'tabfieldvalue'=>array("code,label"),							// List of fields (list of fields to edit a record)
-            'tabfieldinsert'=>array("code,label"),							// List of fields (list of fields for insert)
-            'tabrowid'=>array("rowid"),										// Name of columns with primary key (try to always name it 'rowid')
-            'tabcond'=>array($conf->repair->enabled)						// Condition to show each dictionnary
+            'langs'=>'machine@machine',
+            'tabname'=>array(MAIN_DB_PREFIX."c_machine_type"),			// List of tables we want to see into dictonnary editor
+            'tablib'=>array("Machine Type"),							// Label of tables
+            'tabsql'=>array('SELECT f.rowid as rowid, f.code, f.label, f.active FROM '.MAIN_DB_PREFIX.'c_machine_type as f'),			// Request to select fields
+            'tabsqlsort'=>array("label ASC"),							// Sort order
+            'tabfield'=>array("code,label"),							// List of fields (result of select to show dictionnary)
+            'tabfieldvalue'=>array("code,label"),						// List of fields (list of fields to edit a record)
+            'tabfieldinsert'=>array("code,label"),						// List of fields (list of fields for insert)
+            'tabrowid'=>array("rowid"),									// Name of columns with primary key (try to always name it 'rowid')
+            'tabcond'=>array($conf->machine->enabled)					// Condition to show each dictionnary
         );
 
 		// Exports
@@ -432,15 +418,15 @@ class modRepair extends DolibarrModules
 
 		$r++;
 		$this->export_code[$r]=$this->rights_class.'_'.$r;
-		$this->export_label[$r]='CustomersRepairsAndRepairsLines';	// Translation key (used only if key ExportDataset_xxx_z not found)
-		$this->export_permission[$r]=array(array("repair","repair","export"));
-		$this->export_fields_array[$r]=array('s.rowid'=>"IdCompany",'s.nom'=>'CompanyName','s.address'=>'Address','s.cp'=>'Zip','s.ville'=>'Town','s.fk_pays'=>'Country','s.tel'=>'Phone','s.siren'=>'ProfId1','s.siret'=>'ProfId2','s.ape'=>'ProfId3','s.idprof4'=>'ProfId4','c.rowid'=>"Id",'c.ref'=>"Ref",'c.ref_client'=>"RefClient",'c.fk_soc'=>"IdCompany",'c.date_creation'=>"DateCreation",'c.date_repair'=>"DateOrder",'c.amount_ht'=>"Amount",'c.remise_percent'=>"GlobalDiscount",'c.total_ht'=>"TotalHT",'c.total_ttc'=>"TotalTTC",'c.facture'=>"OrderShortStatusInvoicee",'c.fk_statut'=>'Status','c.note'=>"Note",'c.date_livraison'=>'DeliveryDate','cd.rowid'=>'LineId','cd.description'=>"LineDescription",'cd.product_type'=>'TypeOfLineServiceOrProduct','cd.tva_tx'=>"LineVATRate",'cd.qty'=>"LineQty",'cd.total_ht'=>"LineTotalHT",'cd.total_tva'=>"LineTotalVAT",'cd.total_ttc'=>"LineTotalTTC",'p.rowid'=>'ProductId','p.ref'=>'ProductRef','p.label'=>'Label');
-		$this->export_entities_array[$r]=array('s.rowid'=>"company",'s.nom'=>'company','s.address'=>'company','s.cp'=>'company','s.ville'=>'company','s.fk_pays'=>'company','s.tel'=>'company','s.siren'=>'company','s.ape'=>'company','s.idprof4'=>'company','s.siret'=>'company','c.rowid'=>"order",'c.ref'=>"order",'c.ref_client'=>"order",'c.fk_soc'=>"order",'c.date_creation'=>"order",'c.date_repair'=>"order",'c.amount_ht'=>"order",'c.remise_percent'=>"order",'c.total_ht'=>"order",'c.total_ttc'=>"order",'c.facture'=>"order",'c.fk_statut'=>"order",'c.note'=>"order",'c.date_livraison'=>"order",'cd.rowid'=>'order_line','cd.description'=>"order_line",'cd.product_type'=>'order_line','cd.tva_tx'=>"order_line",'cd.qty'=>"order_line",'cd.total_ht'=>"order_line",'cd.total_tva'=>"order_line",'cd.total_ttc'=>"order_line",'p.rowid'=>'product','p.ref'=>'product','p.label'=>'product');
+		$this->export_label[$r]='CustomersMachinesAndMachinesLines';	// Translation key (used only if key ExportDataset_xxx_z not found)
+		$this->export_permission[$r]=array(array("machine","machine","export"));
+		$this->export_fields_array[$r]=array('s.rowid'=>"IdCompany",'s.nom'=>'CompanyName','s.address'=>'Address','s.cp'=>'Zip','s.ville'=>'Town','s.fk_pays'=>'Country','s.tel'=>'Phone','s.siren'=>'ProfId1','s.siret'=>'ProfId2','s.ape'=>'ProfId3','s.idprof4'=>'ProfId4','c.rowid'=>"Id",'c.ref'=>"Ref",'c.ref_client'=>"RefClient",'c.fk_soc'=>"IdCompany",'c.date_creation'=>"DateCreation",'c.date_machine'=>"DateOrder",'c.amount_ht'=>"Amount",'c.remise_percent'=>"GlobalDiscount",'c.total_ht'=>"TotalHT",'c.total_ttc'=>"TotalTTC",'c.facture'=>"OrderShortStatusInvoicee",'c.fk_statut'=>'Status','c.note'=>"Note",'c.date_livraison'=>'DeliveryDate','cd.rowid'=>'LineId','cd.description'=>"LineDescription",'cd.product_type'=>'TypeOfLineServiceOrProduct','cd.tva_tx'=>"LineVATRate",'cd.qty'=>"LineQty",'cd.total_ht'=>"LineTotalHT",'cd.total_tva'=>"LineTotalVAT",'cd.total_ttc'=>"LineTotalTTC",'p.rowid'=>'ProductId','p.ref'=>'ProductRef','p.label'=>'Label');
+		$this->export_entities_array[$r]=array('s.rowid'=>"company",'s.nom'=>'company','s.address'=>'company','s.cp'=>'company','s.ville'=>'company','s.fk_pays'=>'company','s.tel'=>'company','s.siren'=>'company','s.ape'=>'company','s.idprof4'=>'company','s.siret'=>'company','c.rowid'=>"order",'c.ref'=>"order",'c.ref_client'=>"order",'c.fk_soc'=>"order",'c.date_creation'=>"order",'c.date_machine'=>"order",'c.amount_ht'=>"order",'c.remise_percent'=>"order",'c.total_ht'=>"order",'c.total_ttc'=>"order",'c.facture'=>"order",'c.fk_statut'=>"order",'c.note'=>"order",'c.date_livraison'=>"order",'cd.rowid'=>'order_line','cd.description'=>"order_line",'cd.product_type'=>'order_line','cd.tva_tx'=>"order_line",'cd.qty'=>"order_line",'cd.total_ht'=>"order_line",'cd.total_tva'=>"order_line",'cd.total_ttc'=>"order_line",'p.rowid'=>'product','p.ref'=>'product','p.label'=>'product');
 
 		$this->export_sql_start[$r]='SELECT DISTINCT ';
-		$this->export_sql_end[$r]  =' FROM ('.MAIN_DB_PREFIX.'repair as c, '.MAIN_DB_PREFIX.'societe as s, '.MAIN_DB_PREFIX.'repairdet as cd)';
+		$this->export_sql_end[$r]  =' FROM ('.MAIN_DB_PREFIX.'machine as c, '.MAIN_DB_PREFIX.'societe as s, '.MAIN_DB_PREFIX.'machinedet as cd)';
 		$this->export_sql_end[$r] .=' LEFT JOIN '.MAIN_DB_PREFIX.'product as p on (cd.fk_product = p.rowid)';
-		$this->export_sql_end[$r] .=' WHERE c.fk_soc = s.rowid AND c.rowid = cd.fk_repair';
+		$this->export_sql_end[$r] .=' WHERE c.fk_soc = s.rowid AND c.rowid = cd.fk_machine';
 		$this->export_sql_end[$r] .=' AND c.entity = '.$conf->entity;
 	}
 
@@ -463,9 +449,9 @@ class modRepair extends DolibarrModules
 		$this->remove($options);
 
 		//ODT template
-		$src=DOL_DOCUMENT_ROOT.'/install/doctemplates/repairs/template_repair.odt';
-		$dirodt=DOL_DATA_ROOT.'/doctemplates/repairs';
-		$dest=$dirodt.'/template_repair.odt';
+		$src=DOL_DOCUMENT_ROOT.'/install/doctemplates/machines/template_machine.odt';
+		$dirodt=DOL_DATA_ROOT.'/doctemplates/machines';
+		$dest=$dirodt.'/template_machine.odt';
 
 		if (file_exists($src) && ! file_exists($dest))
 		{
@@ -482,7 +468,7 @@ class modRepair extends DolibarrModules
 
 		$sql = array(
 				"DELETE FROM ".MAIN_DB_PREFIX."document_model WHERE nom = '".$this->const[0][2]."' AND entity = ".$conf->entity,
-				"INSERT INTO ".MAIN_DB_PREFIX."document_model (nom, type, entity) VALUES('".$this->const[0][2]."','repair',".$conf->entity.")"
+				"INSERT INTO ".MAIN_DB_PREFIX."document_model (nom, type, entity) VALUES('".$this->const[0][2]."','machine',".$conf->entity.")"
 		);
 
 		 return $this->_init($sql,$options);
@@ -508,14 +494,14 @@ class modRepair extends DolibarrModules
 	/**
 	 *		Create tables, keys and data required by module
 	 * 		Files llx_table1.sql, llx_table1.key.sql llx_data.sql with create table, create keys
-	 * 		and create data repairs must be stored in directory /mymodule/sql/
+	 * 		and create data machines must be stored in directory /mymodule/sql/
 	 *		This function is called by this->init
 	 *
 	 * 		@return		int		<=0 if KO, >0 if OK
 	 */
 	function load_tables()
 	{
-		return $this->_load_tables('/repair/sql/');
+		return $this->_load_tables('/machine/sql/');
 	}
 
 }

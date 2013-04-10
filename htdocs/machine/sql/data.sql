@@ -27,18 +27,10 @@
 -- de l'install et tous les sigles '--' sont supprimés.
 --
 
---
--- Les types de contact d'un element
---
-insert into llx_c_type_contact(rowid, element, source, code, libelle, active ) values (12501, 'repair','internal', 'SALESREPFOLL',  'Responsable suivi de la réparation', 1);
-insert into llx_c_type_contact(rowid, element, source, code, libelle, active ) values (12502,'repair','external', 'BILLING',       'Contact client facturation réparation', 1);
-insert into llx_c_type_contact(rowid, element, source, code, libelle, active ) values (12503,'repair','external', 'CUSTOMER',      'Contact client suivi réparation', 1);
-insert into llx_c_type_contact(rowid, element, source, code, libelle, active ) values (12504,'repair','external', 'SHIPPING',      'Contact client livraison réparation', 1);
---
---
---
-insert into llx_c_repair_support(rowid,code, label, active, module ) values (1,'Mag','Magasin', 1, 'repair');
-
+insert into llx_c_machine_type(rowid,code, label, active, module ) values (1,'IMP','Imprimante', 1, 'repair');
+insert into llx_c_machine_type(rowid,code, label, active, module ) values (2,'MFC','Multifonction', 1, 'repair');
+insert into llx_c_machine_type(rowid,code, label, active, module ) values (3,'FAX','Fax', 1, 'repair');
+insert into llx_c_machine_type(rowid,code, label, active, module ) values (4,'COP','Photocopieur', 1, 'repair');
 
 
 
