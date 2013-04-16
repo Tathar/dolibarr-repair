@@ -1028,6 +1028,243 @@ class Repair extends CommonOrder
     }
 
 
+    /**
+     *	Add an order line into database (linked to product/service or not)
+     *
+     *	@param      int				$repairid      	Id of line
+     *	@param      string			$desc            	Description of line
+     *	@param      double			$pu_ht    	        Unit price (without tax)
+     *	@param      double			$qty             	Quantite
+     *	@param      double			$txtva           	Taux de tva force, sinon -1
+     *	@param      double			$txlocaltax1		Local tax 1 rate
+     *	@param      double			$txlocaltax2		Local tax 2 rate
+     *	@param      int				$fk_product      	Id du produit/service predefini
+     *	@param      double			$remise_percent  	Pourcentage de remise de la ligne
+     *	@param      int				$info_bits			Bits de type de lignes
+     *	@param      int				$fk_remise_except	Id remise
+     *	@param      string			$price_base_type	HT or TTC
+     *	@param      double			$pu_ttc    		    Prix unitaire TTC
+     *	@param      timestamp		$date_start       	Start date of the line - Added by Matelli (See http://matelli.fr/showcases/patchs-dolibarr/add-dates-in-order-lines.html)
+     *	@param      timestamp		$date_end         	End date of the line - Added by Matelli (See http://matelli.fr/showcases/patchs-dolibarr/add-dates-in-order-lines.html)
+     *	@param      int				$type				Type of line (0=product, 1=service)
+     *	@param      int				$rang             	Position of line
+     *	@param		int				$special_code		Special code
+     *	@param		int				$fk_parent_line		Parent line
+     *  @param		int				$fk_fournprice		Id supplier price
+     *  @param		int				$pa_ht				Buying price (without tax)
+     *  @param		string			$label				Label
+     *	@return     int             					>0 if OK, <0 if KO
+     *
+     *	@see        add_product
+     *
+     *	Les parametres sont deja cense etre juste et avec valeurs finales a l'appel
+     *	de cette methode. Aussi, pour le taux tva, il doit deja avoir ete defini
+     *	par l'appelant par la methode get_default_tva(societe_vendeuse,societe_acheteuse,produit)
+     *	et le desc doit deja avoir la bonne valeur (a l'appelant de gerer le multilangue)
+     */
+    function addline($repairid, $desc, $pu_ht, $qty, $txtva, $txlocaltax1=0, $txlocaltax2=0, $fk_product=0, $remise_percent=0, $info_bits=0, $fk_remise_except=0, $price_base_type='HT', $pu_ttc=0, $date_start='', $date_end='', $type=0, $rang=-1, $special_code=0, $fk_parent_line=0, $fk_fournprice=null, $pa_ht=0, $label='')
+    {
+        dol_syslog(get_class($this)."::addline repairid=$repairid, desc=$desc, pu_ht=$pu_ht, qty=$qty, txtva=$txtva, fk_product=$fk_product, remise_percent=$remise_percent, info_bits=$info_bits, fk_remise_except=$fk_remise_except, price_base_type=$price_base_type, pu_ttc=$pu_ttc, date_start=$date_start, date_end=$date_end, type=$type", LOG_DEBUG);
+
+        include_once(DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php');
+
+        // Clean parameters
+        if (empty($remise_percent)) $remise_percent=0;
+        if (empty($qty)) $qty=0;
+        if (empty($info_bits)) $info_bits=0;
+        if (empty($rang)) $rang=0;
+        if (empty($txtva)) $txtva=0;
+        if (empty($txlocaltax1)) $txlocaltax1=0;
+        if (empty($txlocaltax2)) $txlocaltax2=0;
+        if (empty($fk_parent_line) || $fk_parent_line < 0) $fk_parent_line=0;
+
+        $remise_percent=price2num($remise_percent);
+        $qty=price2num($qty);
+        $pu_ht=price2num($pu_ht);
+        $pu_ttc=price2num($pu_ttc);
+    	$pa_ht=price2num($pa_ht);
+        $txtva = price2num($txtva);
+        $txlocaltax1 = price2num($txlocaltax1);
+        $txlocaltax2 = price2num($txlocaltax2);
+        if ($price_base_type=='HT')
+        {
+            $pu=$pu_ht;
+        }
+        else
+        {
+            $pu=$pu_ttc;
+        }
+        $label=trim($label);
+        $desc=trim($desc);
+
+        // Check parameters
+        if ($type < 0) return -1;
+
+        if ($this->statut == 0)
+        {
+            $this->db->begin();
+
+            // Calcul du total TTC et de la TVA pour la ligne a partir de
+            // qty, pu, remise_percent et txtva
+            // TRES IMPORTANT: C'est au moment de l'insertion ligne qu'on doit stocker
+            // la part ht, tva et ttc, et ce au niveau de la ligne qui a son propre taux tva.
+            $tabprice = calcul_price_total($qty, $pu, $remise_percent, $txtva, $txlocaltax1, $txlocaltax2, 0, $price_base_type, $info_bits, $type);
+            $total_ht  = $tabprice[0];
+            $total_tva = $tabprice[1];
+            $total_ttc = $tabprice[2];
+            $total_localtax1 = $tabprice[9];
+            $total_localtax2 = $tabprice[10];
+
+            // Rang to use
+            $rangtouse = $rang;
+            if ($rangtouse == -1)
+            {
+                $rangmax = $this->line_max($fk_parent_line);
+                $rangtouse = $rangmax + 1;
+            }
+
+            // TODO A virer
+            // Anciens indicateurs: $price, $remise (a ne plus utiliser)
+            $price = $pu;
+            $remise = 0;
+            if ($remise_percent > 0)
+            {
+                $remise = round(($pu * $remise_percent / 100), 2);
+                $price = $pu - $remise;
+            }
+
+            // Insert line
+            $this->line=new RepairLine($this->db);
+
+            $this->line->fk_repair=$repairid;
+            $this->line->label=$label;
+            $this->line->desc=$desc;
+            $this->line->qty=$qty;
+            $this->line->tva_tx=$txtva;
+            $this->line->localtax1_tx=$txlocaltax1;
+            $this->line->localtax2_tx=$txlocaltax2;
+            $this->line->fk_product=$fk_product;
+            $this->line->fk_remise_except=$fk_remise_except;
+            $this->line->remise_percent=$remise_percent;
+            $this->line->subprice=$pu_ht;
+            $this->line->rang=$rangtouse;
+            $this->line->info_bits=$info_bits;
+            $this->line->total_ht=$total_ht;
+            $this->line->total_tva=$total_tva;
+            $this->line->total_localtax1=$total_localtax1;
+            $this->line->total_localtax2=$total_localtax2;
+            $this->line->total_ttc=$total_ttc;
+            $this->line->product_type=$type;
+            $this->line->special_code=$special_code;
+            $this->line->fk_parent_line=$fk_parent_line;
+
+            $this->line->date_start=$date_start;
+            $this->line->date_end=$date_end;
+
+			// infos marge
+			$this->line->fk_fournprice = $fk_fournprice;
+			$this->line->pa_ht = $pa_ht;
+
+            // TODO Ne plus utiliser
+            $this->line->price=$price;
+            $this->line->remise=$remise;
+
+            $result=$this->line->insert();
+            if ($result > 0)
+            {
+                // Reorder if child line
+                if (! empty($fk_parent_line)) $this->line_order(true,'DESC');
+
+                // Mise a jour informations denormalisees au niveau de la repair meme
+                $this->id=$repairid;	// TODO A virer
+                $result=$this->update_price(1);
+                if ($result > 0)
+                {
+                    $this->db->commit();
+                    return $this->line->rowid;
+                }
+                else
+                {
+                    $this->db->rollback();
+                    return -1;
+                }
+            }
+            else
+            {
+                $this->error=$this->line->error;
+                dol_syslog(get_class($this)."::addline error=".$this->error, LOG_ERR);
+                $this->db->rollback();
+                return -2;
+            }
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1705,166 +1942,7 @@ class Repair extends CommonOrder
 
 
 
-    /**
-     *	Add an order line into database (linked to product/service or not)
-     *
-     *	@param      int				$repairid      	Id of line
-     *	@param      string			$desc            	Description of line
-     *	@param      double			$pu_ht    	        Unit price (without tax)
-     *	@param      double			$qty             	Quantite
-     *	@param      double			$txtva           	Taux de tva force, sinon -1
-     *	@param      double			$txlocaltax1		Local tax 1 rate
-     *	@param      double			$txlocaltax2		Local tax 2 rate
-     *	@param      int				$fk_product      	Id du produit/service predefini
-     *	@param      double			$remise_percent  	Pourcentage de remise de la ligne
-     *	@param      int				$info_bits			Bits de type de lignes
-     *	@param      int				$fk_remise_except	Id remise
-     *	@param      string			$price_base_type	HT or TTC
-     *	@param      double			$pu_ttc    		    Prix unitaire TTC
-     *	@param      timestamp		$date_start       	Start date of the line - Added by Matelli (See http://matelli.fr/showcases/patchs-dolibarr/add-dates-in-order-lines.html)
-     *	@param      timestamp		$date_end         	End date of the line - Added by Matelli (See http://matelli.fr/showcases/patchs-dolibarr/add-dates-in-order-lines.html)
-     *	@param      int				$type				Type of line (0=product, 1=service)
-     *	@param      int				$rang             	Position of line
-     *	@param		int				$special_code		Special code
-     *	@param		int				$fk_parent_line		Parent line
-     *	@return     int             					>0 if OK, <0 if KO
-     *
-     *	@see        add_product
-     *
-     *	Les parametres sont deja cense etre juste et avec valeurs finales a l'appel
-     *	de cette methode. Aussi, pour le taux tva, il doit deja avoir ete defini
-     *	par l'appelant par la methode get_default_tva(societe_vendeuse,societe_acheteuse,produit)
-     *	et le desc doit deja avoir la bonne valeur (a l'appelant de gerer le multilangue)
-     */
-    function addline($repairid, $desc, $pu_ht, $qty, $txtva, $txlocaltax1=0, $txlocaltax2=0, $fk_product=0, $remise_percent=0, $info_bits=0, $fk_remise_except=0, $price_base_type='HT', $pu_ttc=0, $date_start='', $date_end='', $type=0, $rang=-1, $special_code=0, $fk_parent_line=0)
-    {
-        dol_syslog("Repair::addline repairid=$repairid, desc=$desc, pu_ht=$pu_ht, qty=$qty, txtva=$txtva, fk_product=$fk_product, remise_percent=$remise_percent, info_bits=$info_bits, fk_remise_except=$fk_remise_except, price_base_type=$price_base_type, pu_ttc=$pu_ttc, date_start=$date_start, date_end=$date_end, type=$type", LOG_DEBUG);
 
-        include_once(DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php');
-
-        // Clean parameters
-        if (empty($remise_percent)) $remise_percent=0;
-        if (empty($qty)) $qty=0;
-        if (empty($info_bits)) $info_bits=0;
-        if (empty($rang)) $rang=0;
-        if (empty($txtva)) $txtva=0;
-        if (empty($txlocaltax1)) $txlocaltax1=0;
-        if (empty($txlocaltax2)) $txlocaltax2=0;
-        if (empty($fk_parent_line) || $fk_parent_line < 0) $fk_parent_line=0;
-
-        $remise_percent=price2num($remise_percent);
-        $qty=price2num($qty);
-        $pu_ht=price2num($pu_ht);
-        $pu_ttc=price2num($pu_ttc);
-        $txtva = price2num($txtva);
-        $txlocaltax1 = price2num($txlocaltax1);
-        $txlocaltax2 = price2num($txlocaltax2);
-        if ($price_base_type=='HT')
-        {
-            $pu=$pu_ht;
-        }
-        else
-        {
-            $pu=$pu_ttc;
-        }
-        $desc=trim($desc);
-
-        // Check parameters
-        if ($type < 0) return -1;
-
-        if ($this->statut == 0)
-        {
-            $this->db->begin();
-
-            // Calcul du total TTC et de la TVA pour la ligne a partir de
-            // qty, pu, remise_percent et txtva
-            // TRES IMPORTANT: C'est au moment de l'insertion ligne qu'on doit stocker
-            // la part ht, tva et ttc, et ce au niveau de la ligne qui a son propre taux tva.
-            $tabprice = calcul_price_total($qty, $pu, $remise_percent, $txtva, $txlocaltax1, $txlocaltax2, 0, $price_base_type, $info_bits);
-            $total_ht  = $tabprice[0];
-            $total_tva = $tabprice[1];
-            $total_ttc = $tabprice[2];
-            $total_localtax1 = $tabprice[9];
-            $total_localtax2 = $tabprice[10];
-
-            // Rang to use
-            $rangtouse = $rang;
-            if ($rangtouse == -1)
-            {
-                $rangmax = $this->line_max($fk_parent_line);
-                $rangtouse = $rangmax + 1;
-            }
-
-            // TODO A virer
-            // Anciens indicateurs: $price, $remise (a ne plus utiliser)
-            $price = $pu;
-            $remise = 0;
-            if ($remise_percent > 0)
-            {
-                $remise = round(($pu * $remise_percent / 100), 2);
-                $price = $pu - $remise;
-            }
-
-            // Insert line
-            $this->line=new RepairLine($this->db);
-
-            $this->line->fk_repair=$repairid;
-            $this->line->desc=$desc;
-            $this->line->qty=$qty;
-            $this->line->tva_tx=$txtva;
-            $this->line->localtax1_tx=$txlocaltax1;
-            $this->line->localtax2_tx=$txlocaltax2;
-            $this->line->fk_product=$fk_product;
-            $this->line->fk_remise_except=$fk_remise_except;
-            $this->line->remise_percent=$remise_percent;
-            $this->line->subprice=$pu_ht;
-            $this->line->rang=$rangtouse;
-            $this->line->info_bits=$info_bits;
-            $this->line->total_ht=$total_ht;
-            $this->line->total_tva=$total_tva;
-            $this->line->total_localtax1=$total_localtax1;
-            $this->line->total_localtax2=$total_localtax2;
-            $this->line->total_ttc=$total_ttc;
-            $this->line->product_type=$type;
-            $this->line->special_code=$special_code;
-            $this->line->fk_parent_line=$fk_parent_line;
-
-            $this->line->date_start=$date_start;
-            $this->line->date_end=$date_end;
-
-            // TODO Ne plus utiliser
-            $this->line->price=$price;
-            $this->line->remise=$remise;
-
-            $result=$this->line->insert();
-            if ($result > 0)
-            {
-                // Reorder if child line
-                if (! empty($fk_parent_line)) $this->line_order(true,'DESC');
-
-                // Mise a jour informations denormalisees au niveau de la repair meme
-                $this->id=$repairid;	// TODO A virer
-                $result=$this->update_price(1);
-                if ($result > 0)
-                {
-                    $this->db->commit();
-                    return $this->line->rowid;
-                }
-                else
-                {
-                    $this->db->rollback();
-                    return -1;
-                }
-            }
-            else
-            {
-                $this->error=$this->line->error;
-                dol_syslog("Repair::addline error=".$this->error, LOG_ERR);
-                $this->db->rollback();
-                return -2;
-            }
-        }
-    }
 
 
     /**
