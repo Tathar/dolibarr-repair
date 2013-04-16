@@ -1279,6 +1279,149 @@ class Repair extends CommonOrder
     }
 
 
+    /**
+     *	Get object and lines from database
+     *
+     *	@param      int			$id       		Id of object to load
+     * 	@param		string		$ref			Ref of object
+     * 	@param		string		$ref_ext		External reference of object
+     * 	@param		string		$ref_int		Internal reference of other object
+     *	@return     int         				>0 if OK, <0 if KO, 0 if not found
+     */
+    function fetch($id, $ref='', $ref_ext='', $ref_int='')
+    {
+        global $conf;
+
+        // Check parameters
+        if (empty($id) && empty($ref) && empty($ref_ext) && empty($ref_int)) return -1;
+
+        $sql = 'SELECT c.rowid, c.date_creation, c.ref, c.fk_soc, c.fk_user_author, c.fk_statut, c.on_process';
+        $sql.= ', c.amount_ht, c.total_ht, c.total_ttc, c.tva as total_tva, c.localtax1 as total_localtax1, c.localtax2 as total_localtax2, c.fk_cond_reglement, c.fk_mode_reglement, c.fk_availability, c.fk_input_reason';
+        $sql.= ', c.date_repair';
+        $sql.= ', c.date_livraison';
+		$sql.= ', c.fk_machine, c.breakdown, c.support_id, c.accessory';
+        $sql.= ', c.fk_projet, c.remise_percent, c.remise, c.remise_absolue, c.source, c.facture as facturee';
+        $sql.= ', c.note as note_private, c.note_public, c.ref_client, c.ref_ext, c.ref_int, c.model_pdf, c.fk_adresse_livraison, c.extraparams';
+        $sql.= ', p.code as mode_reglement_code, p.libelle as mode_reglement_libelle';
+        $sql.= ', cr.code as cond_reglement_code, cr.libelle as cond_reglement_libelle, cr.libelle_facture as cond_reglement_libelle_doc';
+        $sql.= ', ca.code as availability_code';
+        $sql.= ', dr.code as demand_reason_code';
+        $sql.= ' FROM '.MAIN_DB_PREFIX.'repair as c';
+        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_payment_term as cr ON (c.fk_cond_reglement = cr.rowid)';
+        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_paiement as p ON (c.fk_mode_reglement = p.id)';
+        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_availability as ca ON (c.fk_availability = ca.rowid)';
+        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_input_reason as dr ON (c.fk_input_reason = ca.rowid)';
+        $sql.= " WHERE c.entity = ".$conf->entity;
+        if ($id)   	  $sql.= " AND c.rowid=".$id;
+        if ($ref)     $sql.= " AND c.ref='".$this->db->escape($ref)."'";
+        if ($ref_ext) $sql.= " AND c.ref_ext='".$this->db->escape($ref_ext)."'";
+        if ($ref_int) $sql.= " AND c.ref_int='".$this->db->escape($ref_int)."'";
+
+        dol_syslog(get_class($this)."::fetch sql=".$sql, LOG_DEBUG);
+        $result = $this->db->query($sql);
+        if ($result)
+        {
+            $obj = $this->db->fetch_object($result);
+            if ($obj)
+            {
+                $this->id                   = $obj->rowid;
+                $this->ref                  = $obj->ref;
+                $this->ref_client           = $obj->ref_client;
+                $this->ref_ext		  		= $obj->ref_ext;
+                $this->ref_int				= $obj->ref_int;
+                $this->socid                = $obj->fk_soc;
+                $this->statut               = $obj->fk_statut;
+                $this->on_process        	= $obj->on_process;
+                $this->user_author_id       = $obj->fk_user_author;
+                $this->total_ht             = $obj->total_ht;
+                $this->total_tva            = $obj->total_tva;
+                $this->total_localtax1		= $obj->total_localtax1;
+                $this->total_localtax2		= $obj->total_localtax2;
+                $this->total_ttc            = $obj->total_ttc;
+                $this->date                 = $this->db->jdate($obj->date_repair);
+                $this->date_repair          = $this->db->jdate($obj->date_repair);
+                $this->remise               = $obj->remise;
+                $this->remise_percent       = $obj->remise_percent;
+                $this->remise_absolue       = $obj->remise_absolue;
+                $this->source               = $obj->source;
+                $this->facturee				= $obj->billed;			// deprecated
+                $this->billed				= $obj->billed;
+                $this->note                 = $obj->note_private;	// deprecated
+                $this->note_private         = $obj->note_private;
+                $this->note_public          = $obj->note_public;
+                $this->breakdown            = $obj->breakdown;
+                $this->support_id           = $obj->support_id;
+                $this->accessory            = $obj->accessory;
+                $this->fk_project           = $obj->fk_projet;
+                $this->modelpdf             = $obj->model_pdf;
+                $this->mode_reglement_id    = $obj->fk_mode_reglement;
+                $this->mode_reglement_code  = $obj->mode_reglement_code;
+                $this->mode_reglement       = $obj->mode_reglement_libelle;
+                $this->cond_reglement_id    = $obj->fk_cond_reglement;
+                $this->cond_reglement_code  = $obj->cond_reglement_code;
+                $this->cond_reglement       = $obj->cond_reglement_libelle;
+                $this->cond_reglement_doc   = $obj->cond_reglement_libelle_doc;
+                $this->availability_id		= $obj->fk_availability;
+                $this->availability_code    = $obj->availability_code;
+                $this->demand_reason_id		= $obj->fk_input_reason;
+                $this->demand_reason_code   = $obj->demand_reason_code;
+                $this->date_livraison       = $this->db->jdate($obj->date_livraison);
+                $this->fk_delivery_address  = $obj->fk_adresse_livraison;
+
+                $this->extraparams			= (array) json_decode($obj->extraparams, true);
+
+                $fk_machine             	= $obj->fk_machine;
+
+                $this->lines                = array();
+
+                if ($this->statut == 0) $this->brouillon = 1;
+
+
+                $this->db->free();
+
+				/*
+                 * trademark & model & N° model & N° Serie & type_id
+                 */
+				$objmac = new Machine($this->db);
+				$result = $objmac->fetch($fk_machine);
+                if ($result < 0)
+                {
+                    return -4;
+                }
+				if ($result)
+                {
+                    $this->trademark  = $objmac->trademark;
+					$this->model      = $objmac->model;
+					$this->type_id    = $objmac->type_id;
+					$this->n_model    = $objmac->n_model;					
+                	$this->serial_num = $objmac->serial_num;
+                }
+
+                /*
+                 * Lines
+                 */
+                $result=$this->fetch_lines();
+                if ($result < 0)
+                {
+                    return -3;
+                }
+                return 1;
+            }
+            else
+            {
+                $this->error='Order with id '.$id.' not found sql='.$sql;
+                dol_syslog(get_class($this).'::fetch '.$this->error);
+                return 0;
+            }
+        }
+        else
+        {
+            dol_syslog(get_class($this).'::fetch Error rowid='.$id, LOG_ERR);
+            $this->error=$this->db->error();
+            return -1;
+        }
+    }
+
 
 
 
@@ -2102,151 +2245,7 @@ class Repair extends CommonOrder
     }
 
 
-    /**
-     *	Get object and lines from database
-     *
-     *	@param      int			$id       		Id of object to load
-     * 	@param		string		$ref			Ref of object
-     * 	@param		string		$ref_ext		External reference of object
-     * 	@param		string		$ref_int		Internal reference of other object
-     *	@return     int         				>0 if OK, <0 if KO, 0 if not found
-     */
-    function fetch($id, $ref='', $ref_ext='', $ref_int='')
-    {
-        global $conf;
 
-        // Check parameters
-        if (empty($id) && empty($ref) && empty($ref_ext) && empty($ref_int)) return -1;
-
-        $sql = 'SELECT c.rowid, c.date_creation, c.ref, c.fk_soc, c.fk_user_author, c.fk_statut, c.repair_statut';
-        $sql.= ', c.amount_ht, c.total_ht, c.total_ttc, c.tva as total_tva, c.localtax1 as total_localtax1, c.localtax2 as total_localtax2, c.fk_cond_reglement, c.fk_mode_reglement, c.fk_availability, c.fk_input_reason';
-        $sql.= ', c.date_repair';
-        $sql.= ', c.date_livraison';
-		$sql.= ', c.fk_machine, c.breakdown, c.support_id, c.accessory';
-        $sql.= ', c.fk_projet, c.remise_percent, c.remise, c.remise_absolue, c.source, c.facture as facturee';
-        $sql.= ', c.note as note_private, c.note_public, c.ref_client, c.ref_ext, c.ref_int, c.model_pdf, c.fk_adresse_livraison, c.extraparams';
-        $sql.= ', p.code as mode_reglement_code, p.libelle as mode_reglement_libelle';
-        $sql.= ', cr.code as cond_reglement_code, cr.libelle as cond_reglement_libelle, cr.libelle_facture as cond_reglement_libelle_doc';
-        $sql.= ', ca.code as availability_code';
-        $sql.= ', dr.code as demand_reason_code';
-        $sql.= ' FROM '.MAIN_DB_PREFIX.'repair as c';
-        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_payment_term as cr ON (c.fk_cond_reglement = cr.rowid)';
-        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_paiement as p ON (c.fk_mode_reglement = p.id)';
-        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_availability as ca ON (c.fk_availability = ca.rowid)';
-        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_input_reason as dr ON (c.fk_input_reason = ca.rowid)';
-        $sql.= " WHERE c.entity = ".$conf->entity;
-        if ($id)   	  $sql.= " AND c.rowid=".$id;
-        if ($ref)     $sql.= " AND c.ref='".$this->db->escape($ref)."'";
-        if ($ref_ext) $sql.= " AND c.ref_ext='".$this->db->escape($ref_ext)."'";
-        if ($ref_int) $sql.= " AND c.ref_int='".$this->db->escape($ref_int)."'";
-
-        dol_syslog(get_class($this)."::fetch sql=".$sql, LOG_DEBUG);
-        $result = $this->db->query($sql);
-        if ($result)
-        {
-            $obj = $this->db->fetch_object($result);
-            if ($obj)
-            {
-                $this->id                     = $obj->rowid;
-                $this->ref                    = $obj->ref;
-                $this->ref_client             = $obj->ref_client;
-                $this->ref_ext				  = $obj->ref_ext;
-                $this->ref_int				  = $obj->ref_int;
-                $this->socid                  = $obj->fk_soc;
-                $this->statut                 = $obj->fk_statut;
-                $this->repair_statut          = $obj->repair_statut;
-                $this->user_author_id         = $obj->fk_user_author;
-                $this->total_ht               = $obj->total_ht;
-                $this->total_tva              = $obj->total_tva;
-                $this->total_localtax1		  = $obj->total_localtax1;
-                $this->total_localtax2		  = $obj->total_localtax2;
-                $this->total_ttc              = $obj->total_ttc;
-                $this->date                   = $this->db->jdate($obj->date_repair);
-                $this->date_repair            = $this->db->jdate($obj->date_repair);
-                $this->remise                 = $obj->remise;
-                $this->remise_percent         = $obj->remise_percent;
-                $this->remise_absolue         = $obj->remise_absolue;
-                $this->source                 = $obj->source;
-                $this->facturee               = $obj->facturee;
-                $this->note                   = $obj->note_private;	// deprecated
-                $this->note_private           = $obj->note_private;
-                $this->note_public            = $obj->note_public;
-                $this->breakdown              = $obj->breakdown;
-                $this->support_id             = $obj->support_id;
-                $this->accessory              = $obj->accessory;
-                $this->fk_project             = $obj->fk_projet;
-                $this->modelpdf               = $obj->model_pdf;
-                $this->mode_reglement_id      = $obj->fk_mode_reglement;
-                $this->mode_reglement_code    = $obj->mode_reglement_code;
-                $this->mode_reglement         = $obj->mode_reglement_libelle;
-                $this->cond_reglement_id      = $obj->fk_cond_reglement;
-                $this->cond_reglement_code    = $obj->cond_reglement_code;
-                $this->cond_reglement         = $obj->cond_reglement_libelle;
-                $this->cond_reglement_doc     = $obj->cond_reglement_libelle_doc;
-                $this->availability_id		  = $obj->fk_availability;
-                $this->availability_code      = $obj->availability_code;
-                $this->demand_reason_id		  = $obj->fk_input_reason;
-                $this->demand_reason_code     = $obj->demand_reason_code;
-                $this->date_livraison         = $this->db->jdate($obj->date_livraison);
-                $this->fk_delivery_address    = $obj->fk_adresse_livraison;
-
-                $this->extraparams			  = (array) json_decode($obj->extraparams, true);
-
-
-                $fk_machine             = $obj->fk_machine;
-
-                $this->lines                 = array();
-
-                if ($this->statut == 0 )
-				{
-					$this->brouillon = 1;
-				}
-
-
-                $this->db->free();
-
-				/*
-                 * trademark & model & N° model & N° Serie & type_id
-                 */
-				$objmac = new Machine($this->db);
-				$result = $objmac->fetch($fk_machine);
-                if ($result < 0)
-                {
-                    return -4;
-                }
-				if ($result)
-                {
-                    $this->trademark  = $objmac->trademark;
-					$this->model      = $objmac->model;
-					$this->type_id    = $objmac->type_id;
-					$this->n_model    = $objmac->n_model;					
-                	$this->serial_num = $objmac->serial_num;
-                }
-
-                /*
-                 * Lines
-                 */
-                $result=$this->fetch_lines();
-                if ($result < 0)
-                {
-                    return -3;
-                }
-                return 1;
-            }
-            else
-            {
-                $this->error='Order with id '.$id.' not found sql='.$sql;
-                dol_syslog(get_class($this).'::fetch '.$this->error);
-                return 0;
-            }
-        }
-        else
-        {
-            dol_syslog(get_class($this).'::fetch Error rowid='.$id, LOG_ERR);
-            $this->error=$this->db->error();
-            return -1;
-        }
-    }
 
 
     /**
