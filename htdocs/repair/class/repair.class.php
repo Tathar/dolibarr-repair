@@ -925,6 +925,109 @@ class Repair extends CommonOrder
     }
 
 
+    /**
+     *  Load an object from a proposal and create a new order into database
+     *
+     *  @param      Object			$object 	        Object source
+     *  @return     int             					<0 if KO, 0 if nothing done, 1 if OK
+     */
+    function createFromProposal($object)
+    {
+        global $conf,$user,$langs;
+        global $hookmanager;
+
+        $error=0;
+
+        // Signed proposal
+        if ($object->statut == 2)
+        {
+            $this->date_repair = dol_now();
+            $this->source = 0;
+
+            $num=count($object->lines);
+            for ($i = 0; $i < $num; $i++)
+            {
+                $line = new RepairLine($this->db);
+
+                $line->libelle           = $object->lines[$i]->libelle;
+                $line->label             = $object->lines[$i]->label;
+                $line->desc              = $object->lines[$i]->desc;
+                $line->price             = $object->lines[$i]->price;
+                $line->subprice          = $object->lines[$i]->subprice;
+                $line->tva_tx            = $object->lines[$i]->tva_tx;
+                $line->localtax1_tx      = $object->lines[$i]->localtax1_tx;
+                $line->localtax2_tx      = $object->lines[$i]->localtax2_tx;
+                $line->qty               = $object->lines[$i]->qty;
+                $line->fk_remise_except  = $object->lines[$i]->fk_remise_except;
+                $line->remise_percent    = $object->lines[$i]->remise_percent;
+                $line->fk_product        = $object->lines[$i]->fk_product;
+                $line->info_bits         = $object->lines[$i]->info_bits;
+                $line->product_type      = $object->lines[$i]->product_type;
+                $line->rang              = $object->lines[$i]->rang;
+                $line->special_code      = $object->lines[$i]->special_code;
+                $line->fk_parent_line    = $object->lines[$i]->fk_parent_line;
+
+                $this->lines[$i] = $line;
+            }
+
+            $this->socid                = $object->socid;
+            $this->fk_project           = $object->fk_project;
+            $this->cond_reglement_id    = $object->cond_reglement_id;
+            $this->mode_reglement_id    = $object->mode_reglement_id;
+            $this->availability_id      = $object->availability_id;
+            $this->demand_reason_id     = $object->demand_reason_id;
+            $this->date_livraison       = $object->date_livraison;
+            $this->fk_delivery_address  = $object->fk_delivery_address;
+            $this->contact_id           = $object->contactid;
+            $this->ref_client           = $object->ref_client;
+            $this->note                 = $object->note;
+            $this->note_public          = $object->note_public;
+
+            $this->origin				= $object->element;
+            $this->origin_id			= $object->id;
+
+            // Possibility to add external linked objects with hooks
+            $this->linked_objects[$this->origin] = $this->origin_id;
+            if (is_array($object->other_linked_objects) && ! empty($object->other_linked_objects))
+            {
+            	$this->linked_objects = array_merge($this->linked_objects, $object->other_linked_objects);
+            }
+
+            $ret = $this->create($user);
+
+            if ($ret > 0)
+            {
+                // Actions hooked (by external module)
+                if (! is_object($hookmanager))
+                {
+                	include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+                	$hookmanager=new HookManager($this->db);
+                }
+                $hookmanager->initHooks(array('orderdao'));
+
+                $parameters=array('objFrom'=>$object);
+                $action='';
+                $reshook=$hookmanager->executeHooks('createFrom',$parameters,$this,$action);    // Note that $action and $object may have been modified by some hooks
+                if ($reshook < 0) $error++;
+
+                if (! $error)
+                {
+                    // Ne pas passer par la repair provisoire
+                    if ($conf->global->REPAIR_VALID_AFTER_CLOSE_PROPAL == 1)
+                    {
+                        $this->fetch($ret);
+                        $this->valid($user);
+                    }
+                    return 1;
+                }
+                else return -1;
+            }
+            else return -1;
+        }
+        else return 0;
+    }
+
+
 
 
 
@@ -1489,106 +1592,7 @@ class Repair extends CommonOrder
 */
 
 
-    /**
-     *  Load an object from a proposal and create a new order into database
-     *
-     *  @param      Object			$object 	        Object source
-     *  @return     int             					<0 if KO, 0 if nothing done, 1 if OK
-     */
-    function createFromProposal($object)
-    {
-        global $conf,$user,$langs;
-        global $hookmanager;
 
-        $error=0;
-
-        // Signed proposal
-        if ($object->statut == 2)
-        {
-            $this->date_repair = dol_now();
-            $this->source = 0;
-
-            $num=count($object->lines);
-            for ($i = 0; $i < $num; $i++)
-            {
-                $line = new RepairLine($this->db);
-
-                $line->libelle           = $object->lines[$i]->libelle;
-                $line->desc              = $object->lines[$i]->desc;
-                $line->price             = $object->lines[$i]->price;
-                $line->subprice          = $object->lines[$i]->subprice;
-                $line->tva_tx            = $object->lines[$i]->tva_tx;
-                $line->localtax1_tx      = $object->lines[$i]->localtax1_tx;
-                $line->localtax2_tx      = $object->lines[$i]->localtax2_tx;
-                $line->qty               = $object->lines[$i]->qty;
-                $line->fk_remise_except  = $object->lines[$i]->fk_remise_except;
-                $line->remise_percent    = $object->lines[$i]->remise_percent;
-                $line->fk_product        = $object->lines[$i]->fk_product;
-                $line->info_bits         = $object->lines[$i]->info_bits;
-                $line->product_type      = $object->lines[$i]->product_type;
-                $line->rang              = $object->lines[$i]->rang;
-                $line->special_code      = $object->lines[$i]->special_code;
-                $line->fk_parent_line    = $object->lines[$i]->fk_parent_line;
-
-                $this->lines[$i] = $line;
-            }
-
-            $this->socid                = $object->socid;
-            $this->fk_project           = $object->fk_project;
-            $this->cond_reglement_id    = $object->cond_reglement_id;
-            $this->mode_reglement_id    = $object->mode_reglement_id;
-            $this->availability_id      = $object->availability_id;
-            $this->demand_reason_id     = $object->demand_reason_id;
-            $this->date_livraison       = $object->date_livraison;
-            $this->fk_delivery_address  = $object->fk_delivery_address;
-            $this->contact_id           = $object->contactid;
-            $this->ref_client           = $object->ref_client;
-            $this->note                 = $object->note;
-            $this->note_public          = $object->note_public;
-
-            $this->origin				= $object->element;
-            $this->origin_id			= $object->id;
-
-            // Possibility to add external linked objects with hooks
-            $this->linked_objects[$this->origin] = $this->origin_id;
-            if (is_array($object->other_linked_objects) && ! empty($object->other_linked_objects))
-            {
-            	$this->linked_objects = array_merge($this->linked_objects, $object->other_linked_objects);
-            }
-
-            $ret = $this->create($user);
-
-            if ($ret > 0)
-            {
-                // Actions hooked (by external module)
-                if (! is_object($hookmanager))
-                {
-                	include_once(DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php');
-                	$hookmanager=new HookManager($this->db);
-                }
-                $hookmanager->initHooks(array('orderdao'));
-
-                $parameters=array('objFrom'=>$object);
-                $action='';
-                $reshook=$hookmanager->executeHooks('createFrom',$parameters,$this,$action);    // Note that $action and $object may have been modified by some hooks
-                if ($reshook < 0) $error++;
-
-                if (! $error)
-                {
-                    // Ne pas passer par la repair provisoire
-                    if ($conf->global->REPAIR_VALID_AFTER_CLOSE_PROPAL == 1)
-                    {
-                        $this->fetch($ret);
-                        $this->valid($user);
-                    }
-                    return 1;
-                }
-                else return -1;
-            }
-            else return -1;
-        }
-        else return 0;
-    }
 
     /**
      *	Delete Repair
