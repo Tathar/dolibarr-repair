@@ -842,6 +842,117 @@ class Repair extends CommonOrder
     }
 
 
+    /**
+     *	Load an object from its id and create a new one in database
+     *
+     *	@param		int			$socid			Id of thirdparty
+     *	@param		HookManager	$hookmanager	Hook manager instance
+     *	@return		int							New id of clone
+     */
+    function createFromClone($socid=0,$hookmanager=false)
+    {
+        global $conf,$user,$langs;
+
+        $error=0;
+
+        $this->db->begin();
+
+        // Load source object
+        $objFrom = dol_clone($this);
+
+        // Change socid if needed
+        if (! empty($socid) && $socid != $this->socid)
+        {
+            $objsoc = new Societe($this->db);
+
+            if ($objsoc->fetch($socid)>0)
+            {
+                $this->socid 				= $objsoc->id;
+                $this->cond_reglement_id	= (! empty($objsoc->cond_reglement_id) ? $objsoc->cond_reglement_id : 0);
+                $this->mode_reglement_id	= (! empty($objsoc->mode_reglement_id) ? $objsoc->mode_reglement_id : 0);
+                $this->fk_project			= '';
+                $this->fk_delivery_address	= '';
+            }
+
+            // TODO Change product price if multi-prices
+        }
+
+        $this->id=0;
+        $this->statut=0;
+		$this->on_progress=0;
+
+        // Clear fields
+        $this->user_author_id     = $user->id;
+        $this->user_valid         = '';
+        $this->date_creation      = '';
+        $this->date_validation    = '';
+        $this->ref_client         = '';
+
+        // Create clone
+        $result=$this->create($user);
+        if ($result < 0) $error++;
+
+        if (! $error)
+        {
+            // Hook of thirdparty module
+            if (is_object($hookmanager))
+            {
+                $parameters=array('objFrom'=>$objFrom);
+                $action='';
+                $reshook=$hookmanager->executeHooks('createFrom',$parameters,$this,$action);    // Note that $action and $object may have been modified by some hooks
+                if ($reshook < 0) $error++;
+            }
+
+            // Appel des triggers
+            include_once DOL_DOCUMENT_ROOT . '/core/class/interfaces.class.php';
+            $interface=new Interfaces($this->db);
+            $result=$interface->run_triggers('ORDER_CLONE',$this,$user,$langs,$conf);
+            if ($result < 0) { $error++; $this->errors=$interface->errors; }
+            // Fin appel triggers
+        }
+
+        // End
+        if (! $error)
+        {
+            $this->db->commit();
+            return $this->id;
+        }
+        else
+        {
+            $this->db->rollback();
+            return -1;
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1376,89 +1487,6 @@ class Repair extends CommonOrder
         }
     }
 */
-
-
-    /**
-     *	Load an object from its id and create a new one in database
-     *
-     *	@param		int			$socid			Id of thirdparty
-     *	@param		HookManager	$hookmanager	Hook manager instance
-     *	@return		int							New id of clone
-     */
-    function createFromClone($socid=0,$hookmanager=false)
-    {
-        global $conf,$user,$langs;
-
-        $error=0;
-
-        $this->db->begin();
-
-        // Load source object
-        $objFrom = dol_clone($this);
-
-        // Change socid if needed
-        if (! empty($socid) && $socid != $this->socid)
-        {
-            $objsoc = new Societe($this->db);
-
-            if ($objsoc->fetch($socid)>0)
-            {
-                $this->socid 				= $objsoc->id;
-                $this->cond_reglement_id	= (! empty($objsoc->cond_reglement_id) ? $objsoc->cond_reglement_id : 0);
-                $this->mode_reglement_id	= (! empty($objsoc->mode_reglement_id) ? $objsoc->mode_reglement_id : 0);
-                $this->fk_project			= '';
-                $this->fk_delivery_address	= '';
-            }
-
-            // TODO Change product price if multi-prices
-        }
-
-        $this->id=0;
-        $this->statut=0;
-		$this->repair_statut=0;
-
-        // Clear fields
-        $this->user_author_id     = $user->id;
-        $this->user_valid         = '';
-        $this->date_creation      = '';
-        $this->date_validation    = '';
-        $this->ref_client         = '';
-
-        // Create clone
-        $result=$this->create($user);
-        if ($result < 0) $error++;
-
-        if (! $error)
-        {
-            // Hook of thirdparty module
-            if (is_object($hookmanager))
-            {
-                $parameters=array('objFrom'=>$objFrom);
-                $action='';
-                $reshook=$hookmanager->executeHooks('createFrom',$parameters,$this,$action);    // Note that $action and $object may have been modified by some hooks
-                if ($reshook < 0) $error++;
-            }
-
-            // Appel des triggers
-            include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
-            $interface=new Interfaces($this->db);
-            $result=$interface->run_triggers('ORDER_CLONE',$this,$user,$langs,$conf);
-            if ($result < 0) { $error++; $this->errors=$interface->errors; }
-            // Fin appel triggers
-        }
-
-        // End
-        if (! $error)
-        {
-            $this->db->commit();
-            return $this->id;
-        }
-        else
-        {
-            $this->db->rollback();
-            return -1;
-        }
-    }
 
 
     /**
