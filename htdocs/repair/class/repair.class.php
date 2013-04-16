@@ -26,7 +26,7 @@
  *  \ingroup    repair
  *  \brief      Fichier des classes de repairs
  */
-require_once(DOL_DOCUMENT_ROOT."/core/class/commonobject.class.php");
+include_once DOL_DOCUMENT_ROOT.'/core/class/commonorder.class.php';
 require_once(DOL_DOCUMENT_ROOT."/product/class/product.class.php");
 require_once(DOL_DOCUMENT_ROOT."/machine/class/machine.class.php");
 
@@ -34,7 +34,7 @@ require_once(DOL_DOCUMENT_ROOT."/machine/class/machine.class.php");
  *  \class      Repair
  *  \brief      Class to manage customers orders
  */
-class Repair extends CommonObject
+class Repair extends CommonOrder
 {
     public $element='repair';
     public $table_element='repair';
@@ -65,7 +65,7 @@ class Repair extends CommonObject
 //TODO fk_machine_lend 
 	var $accessory;
 	var $statut;		// -1=Canceled, 0=Draft, 1=Validated, (2=Accepted/On process not managed for customer orders), 3=Closed (Sent/Received, billed or not)
-	var $repair_statut;		// -2=Refused estimates, -1=Canceled, 0=Draft/Waiting estimate, 1=estimates during, 2=complete estimates, 3=Validated estimates, 4=accepted estimate, 5=repair in progress(not managed), 5=Validated repair, 6=complete repair, 7=Validated repair/Waiting shipment, 8=Closed (Sent/Received, billed or not)
+	var $on_process;		// 0=Waiting, 1=On process
 
     var $facturee;		// Facturee ou non
     var $brouillon;
@@ -118,10 +118,8 @@ class Repair extends CommonObject
      *
      *  @param		DoliDB		$db      Database handler
      */
-    function Repair($db)
+    function __construct($db)
     {
-        global $langs;
-        $langs->load('repairlang@repair');
         $this->db = $db;
 
         $this->remise = 0;
@@ -151,7 +149,7 @@ class Repair extends CommonObject
             // Chargement de la classe de numerotation
             $classname = $conf->global->REPAIR_ADDON;
 
-            $result=include_once($dir.'/'.$file);
+            $result=include_once $dir.'/'.$file;
             if ($result)
             {
                 $obj = new $classname();
@@ -183,37 +181,38 @@ class Repair extends CommonObject
 
 
     /**
-     *	Create Estimate
+     *	Validate Repair
      *
-     *	@param		User	$user     		User making status change
-     *	@return  	int						<=0 if OK, >0 if KO
+     *	@param	User	$user			Object user that modify
+     *	@param	int		$idwarehouse	Id warehouse to use for stock change.
+     *	@return	int						<0 if KO, >0 if OK
      */
-    function createEstimate($user)
+    function valid($user, $idwarehouse=0)
     {
         global $conf,$langs;
-        require_once(DOL_DOCUMENT_ROOT."/core/lib/files.lib.php");
+        require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
         $error=0;
-		dol_syslog(get_class($this)."::createEstimate", LOG_DEBUG);
+
         // Protection
-        if ($this->repair_statut != 0)
+        if ($this->statut == 1)
         {
-            dol_syslog(get_class($this)."::createEstimate no draft status", LOG_WARNING);
+			dol_syslog(get_class($this)."::valid no draft status", LOG_WARNING);
             return 0;
         }
 
-        if (! $user->rights->repair->CreateEstimate)
+        if (! $user->rights->repair->ValidateRepair)
         {
             $this->error='Permission denied';
-            dol_syslog(get_class($this)."::createEstimates ".$this->error, LOG_ERR);
+            dol_syslog(get_class($this)."::valid ".$this->error, LOG_ERR);
             return -1;
         }
 
-//        $now=dol_now();
+		$now=dol_now();
 
         $this->db->begin();
 
-        // Definition du nom de module de numerotation de repair
+        // Definition du nom de module de numerotation de reparation
         $soc = new Societe($this->db);
         $soc->fetch($this->socid);
 
@@ -233,296 +232,27 @@ class Repair extends CommonObject
         // Validate
         $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
         $sql.= " SET ref = '".$num."',";
-        $sql.= " fk_statut = 0,";
-        $sql.= " repair_statut = 1";
-//        $sql.= " date_valid='".$this->db->idate($now)."',";
-//        $sql.= " fk_user_valid = ".$user->id;
+        $sql.= " fk_statut = 1,";
+        $sql.= " on_process = 0,";
+        $sql.= " date_valid='".$this->db->idate($now)."',";
+        $sql.= " fk_user_valid = ".$user->id;
         $sql.= " WHERE rowid = ".$this->id;
 
         dol_syslog(get_class($this)."::valid() sql=".$sql);
-        $resql=$this->db->query($sql);
-        if (! $resql)
+		$resql=$this->db->query($sql);
+		if (! $resql)
         {
-            dol_syslog(get_class($this)."::valid Echec update - 10 - sql=".$sql, LOG_ERR);
+            dol_syslog(get_class($this)."::valid() Echec update - 10 - sql=".$sql, LOG_ERR);
             dol_print_error($this->db);
             $error++;
         }
-
-        if (! $error)
-        {
-            $this->oldref='';
-
-            // Rename directory if dir was a temporary ref
-            if (preg_match('/^[\(]?PROV/i', $this->ref))
-            {
-                // On renomme repertoire ($this->ref = ancienne ref, $numfa = nouvelle ref)
-                // afin de ne pas perdre les fichiers attaches
-                $comref = dol_sanitizeFileName($this->ref);
-                $snum = dol_sanitizeFileName($num);
-                $dirsource = $conf->repair->dir_output.'/'.$comref;
-                $dirdest = $conf->repair->dir_output.'/'.$snum;
-                if ((file_exists($dirsource)) && ($dirsource != $dirdest) )
-                {
-                    dol_syslog(get_class($this)."::valid() rename dir ".$dirsource." into ".$dirdest);
-
-                    if (@rename($dirsource, $dirdest))
-                    {
-                        $this->oldref = $comref;
-
-                        dol_syslog("Rename ok");
-                        // Suppression ancien fichier PDF dans nouveau rep
-                        dol_delete_file($conf->repair->dir_output.'/'.$snum.'/'.$comref.'*.*');
-                    }
-                }
-            }
-        }
-
-        // Set new ref and current status
-        if (! $error)
-        {
-            $this->ref = $num;
-            $this->statut = 0;
-            $this->repair_statut = 1;
-        }
-
-        if (! $error)
-        {
-            // Appel des triggers
-            include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
-            $interface=new Interfaces($this->db);
-            $result=$interface->run_triggers('REPAIR_CREATE_ESTIMATE',$this,$user,$langs,$conf);
-            if ($result < 0) { $error++; $this->errors=$interface->errors; }
-            // Fin appel triggers
-        }
-
-        if (! $error)
-        {
-            $this->db->commit();
-            return 1;
-        }
-        else
-        {
-            $this->db->rollback();
-            $this->error=$this->db->lasterror();
-            return -1;
-        }
-    }
-
-
-
-    /**
-     *	Finish Estimate
-     *
-     *	@param		User	$user     		User making status change
-     *	@return  	int						<=0 if OK, >0 if KO
-     */
-    function finishEstimate($user)
-    {
-        global $conf,$langs;
-        require_once(DOL_DOCUMENT_ROOT."/core/lib/files.lib.php");
-
-        $error=0;
-		dol_syslog(get_class($this)."::finishEstimate", LOG_DEBUG);
-        // Protection
-        if ($this->repair_statut != 1)
-        {
-            dol_syslog(get_class($this)."::finishEstimate no estimate status", LOG_WARNING);
-            return 0;
-        }
-
-        if (! $user->rights->repair->CreateEstimate)
-        {
-            $this->error='Permission denied';
-            dol_syslog(get_class($this)."::finishEstimate ".$this->error, LOG_ERR);
-            return -1;
-        }
-
-        $now=dol_now();
-
-        $this->db->begin();
-
-        // Validate
-        $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-        $sql.= " SET";
-        $sql.= " fk_statut = 1,";
-        $sql.= " repair_statut = 2,";
-        $sql.= " fk_user_estimate = ".$user->id;
-        $sql.= " WHERE rowid = ".$this->id;
-
-        dol_syslog(get_class($this)."::valid() sql=".$sql);
-        $resql=$this->db->query($sql);
-        if (! $resql)
-        {
-            dol_syslog(get_class($this)."::valid Echec update - 10 - sql=".$sql, LOG_ERR);
-            dol_print_error($this->db);
-            $error++;
-        }
-
-        // Set new ref and current status
-        if (! $error)
-        {
-            $this->statut = 1;
-            $this->repair_statut = 2;
-        }
-
-        if (! $error)
-        {
-            // Appel des triggers
-            include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
-            $interface=new Interfaces($this->db);
-            $result=$interface->run_triggers('REPAIR_FINISH_ESTIMATE',$this,$user,$langs,$conf);
-            if ($result < 0) { $error++; $this->errors=$interface->errors; }
-            // Fin appel triggers
-        }
-
-        if (! $error)
-        {
-            $this->db->commit();
-            return 1;
-        }
-        else
-        {
-            $this->db->rollback();
-            $this->error=$this->db->lasterror();
-            return -1;
-        }
-    }
-
-
-
-    /**
-     *	Cancel Estimate
-     *
-     *	@param		User	$user     		User making status change
-     *	@return  	int						<=0 if OK, >0 if KO
-     */    
-	function cancelEstimate($user, $idwarehouse=-1)
-    {
-        global $conf,$langs;
-
-        $error=0;
-
-        if ($user->rights->repair->CreateEstimate)
-        {
-            $this->db->begin();
-
-            $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-            $sql.= " SET fk_statut = 0,";
-            $sql.= " repair_statut = 0";
-            $sql.= " WHERE rowid = ".$this->id;
-            $sql.= " AND repair_statut = 1";
-
-            dol_syslog("Repair::cancelEstimate sql=".$sql, LOG_DEBUG);
-            if ($this->db->query($sql))
-            {
-                if (! $error)
-                {
-                    // Appel des triggers
-                    include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
-                    $interface=new Interfaces($this->db);
-                    $result=$interface->run_triggers('REPAIR_CANCEL_ESTIMATE',$this,$user,$langs,$conf);
-                    if ($result < 0) { $error++; $this->errors=$interface->errors; }
-                    // Fin appel triggers
-                }
-
-                if (! $error)
-                {
-                    $this->statut=0;
-                    $this->repair_statut=0;
-                    $this->db->commit();
-                    return 1;
-                }
-                else
-                {
-                    $this->error=$mouvP->error;
-                    $this->db->rollback();
-                    return -1;
-                }
-            }
-            else
-            {
-                $this->error=$this->db->error();
-                $this->db->rollback();
-                dol_syslog($this->error, LOG_ERR);
-                return -1;
-            }
-        }
-    }
-
-
-    /**
-     *	Validate Estimate
-     *
-     *	@param		User	$user     		User making status change
-     *	@param		int		$idwarehouse	Id of warehouse to use for stock decrease
-     *	@return  	int						<=0 if OK, >0 if KO
-     */
-    function ValidateEstimate($user, $idwarehouse=0)
-    {
-        global $conf,$langs;
-        require_once(DOL_DOCUMENT_ROOT."/core/lib/files.lib.php");
-
-        $error=0;
-        // Protection
-        if ($this->repair_statut != 2)
-        {
-            dol_syslog(get_class($this)."::validateEstimate wrong status ".$this->repair_statut, LOG_WARNING);
-            return 0;
-        }
-
-        if (! $user->rights->repair->ValidateEstimate)
-        {
-            $this->error='Permission denied';
-            dol_syslog(get_class($this)."::validateEstimate ".$this->error, LOG_ERR);
-            return -1;
-        }
-
-        $now=dol_now();
-
-        $this->db->begin();
-/*
-        // Definition du nom de module de numerotation de repair
-        $soc = new Societe($this->db);
-        $soc->fetch($this->socid);
-
-        // Class of company linked to order
-        $result=$soc->set_as_client();
-
-        // Define new ref
-        if (! $error && (preg_match('/^[\(]?PROV/i', $this->ref)))
-        {
-            $num = $this->getNextNumRef($soc);
-        }
-        else
-        {
-            $num = $this->ref;
-        }
-*/
-        // Validate
-        $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-        $sql.= " SET";
-//        $sql.= " ref = '".$num."',";
-        $sql.= " fk_statut = 1,";
-        $sql.= " repair_statut = 3,";
-        $sql.= " date_valid_e='".$this->db->idate($now)."',";
-        $sql.= " fk_user_valid_e = ".$user->id;
-        $sql.= " WHERE rowid = ".$this->id;
-
-        dol_syslog(get_class($this)."::validateEstimate() sql=".$sql);
-        $resql=$this->db->query($sql);
-        if (! $resql)
-        {
-            dol_syslog(get_class($this)."::validateEstimate Echec update - 10 - sql=".$sql, LOG_ERR);
-            dol_print_error($this->db);
-            $error++;
-        }
-/*
+//TODO Verifier la gestion des stock
         if (! $error)
         {
             // If stock is incremented on validate order, we must increment it
-            if ($result >= 0 && $conf->stock->enabled && $conf->global->STOCK_CALCULATE_ON_VALIDATE_ORDER == 1)
+            if ($result >= 0 && ! empty($conf->stock->enabled) && $conf->global->STOCK_CALCULATE_ON_VALIDATE_ORDER == 1)
             {
-                require_once(DOL_DOCUMENT_ROOT."/product/stock/class/mouvementstock.class.php");
+                require_once DOL_DOCUMENT_ROOT.'/product/stock/class/mouvementstock.class.php';
                 $langs->load("agenda");
 
                 // Loop on each line
@@ -539,8 +269,8 @@ class Repair extends CommonObject
                 }
             }
         }
-*/
-/*        if (! $error)
+
+        if (! $error)
         {
             $this->oldref='';
 
@@ -568,21 +298,20 @@ class Repair extends CommonObject
                 }
             }
         }
-*/
+
         // Set new ref and current status
         if (! $error)
         {
-//            $this->ref = $num;
+            $this->ref = $num;
             $this->statut = 1;
-            $this->repair_statut = 3;
         }
 
         if (! $error)
         {
             // Appel des triggers
-            include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
+            include_once DOL_DOCUMENT_ROOT . '/core/class/interfaces.class.php';
             $interface=new Interfaces($this->db);
-            $result=$interface->run_triggers('ORDER_VALIDATE_ESTIMATE',$this,$user,$langs,$conf);
+            $result=$interface->run_triggers('ORDER_VALIDATE',$this,$user,$langs,$conf);
             if ($result < 0) { $error++; $this->errors=$interface->errors; }
             // Fin appel triggers
         }
@@ -601,26 +330,25 @@ class Repair extends CommonObject
     }
 
     /**
-     *	Modify Estimate
+     *	Set draft status
      *
      *	@param	User	$user			Object user that modify
      *	@param	int		$idwarehouse	Id warehouse to use for stock change.
      *	@return	int						<0 if KO, >0 if OK
      */
-    function modifyEstimate($user, $idwarehouse=-1)
+    function set_draft($user, $idwarehouse=-1)
     {
         global $conf,$langs;
 
         $error=0;
 
         // Protection
-        if ($this->repair_statut != 2)
+        if ($this->statut <= 0)
         {
-			dol_syslog(get_class($this)."::modifyEstimate wrong status ".$this->repair_statut, LOG_WARNING);
             return 0;
         }
 
-        if (! $user->rights->repair->CreateEstimate)
+        if (! $user->rights->repair->valider)
         {
             $this->error='Permission denied';
             return -1;
@@ -629,18 +357,17 @@ class Repair extends CommonObject
         $this->db->begin();
 
         $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-        $sql.= " SET";
-		$sql.= " fk_statut = 0,";
-        $sql.= " repair_statut = 1";
+        $sql.= " SET fk_statut = 0,";
+        $sql.= " on_process = 0";
         $sql.= " WHERE rowid = ".$this->id;
 
-        dol_syslog(get_class($this)."::modifyEstimate sql=".$sql, LOG_DEBUG);
+        dol_syslog(get_class($this)."::set_draft sql=".$sql, LOG_DEBUG);
         if ($this->db->query($sql))
         {
-/*            // If stock is decremented on validate order, we must reincrement it
-            if ($conf->stock->enabled && $conf->global->STOCK_CALCULATE_ON_VALIDATE_ORDER == 1)
+            // If stock is decremented on validate order, we must reincrement it
+            if (! empty($conf->stock->enabled) && $conf->global->STOCK_CALCULATE_ON_VALIDATE_ORDER == 1)
             {
-                require_once(DOL_DOCUMENT_ROOT."/product/stock/class/mouvementstock.class.php");
+                require_once DOL_DOCUMENT_ROOT.'/product/stock/class/mouvementstock.class.php';
                 $langs->load("agenda");
 
                 $num=count($this->lines);
@@ -658,6 +385,7 @@ class Repair extends CommonObject
                 if (!$error)
                 {
                     $this->statut=0;
+					$this->on_process=0;
                     $this->db->commit();
                     return $result;
                 }
@@ -668,9 +396,8 @@ class Repair extends CommonObject
                     return $result;
                 }
             }
-*/
+
             $this->statut=0;
-            $this->repair_statut=1;
             $this->db->commit();
             return 1;
         }
@@ -679,111 +406,208 @@ class Repair extends CommonObject
             $this->error=$this->db->error();
             $this->db->rollback();
             dol_syslog($this->error, LOG_ERR);
+            return -1;
+        }
+    }
+
+
+    /**
+     *	Tag the order as validated (opened)
+     *	Function used when order is reopend after being closed.
+     *
+     *	@param      User	$user       Object user that change status
+     *	@return     int         		<0 if KO, 0 if nothing is done, >0 if OK
+     */
+    function set_reopen($user)
+    {
+        global $conf,$langs;
+        $error=0;
+
+        if ($this->statut != 3)
+        {
+            return 0;
+        }
+
+        $this->db->begin();
+
+        $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
+        $sql.= ' SET fk_statut=1, facture=0';
+        $sql.= ' WHERE rowid = '.$this->id;
+
+        dol_syslog("Repair::set_reopen sql=".$sql);
+        $resql = $this->db->query($sql);
+        if ($resql)
+        {
+            // Appel des triggers
+            include_once DOL_DOCUMENT_ROOT . '/core/class/interfaces.class.php';
+            $interface=new Interfaces($this->db);
+            $result=$interface->run_triggers('REPAIR_REOPEN',$this,$user,$langs,$conf);
+            if ($result < 0) { $error++; $this->errors=$interface->errors; }
+            // Fin appel triggers
+        }
+        else
+        {
+            $error++;
+            $this->error=$this->db->error();
+            dol_print_error($this->db);
+        }
+
+        if (! $error)
+        {
+            $this->statut = 1;
+        	$this->billed = 0;
+			$this->facturee = 0; // deprecated
+
+            $this->db->commit();
+            return 1;
+        }
+        else
+        {
+            $this->db->rollback();
             return -1;
         }
     }
 
     /**
-     *	Accepted Estimate
+     *  Close order
      *
-     *	@param	User	$user			Object user that modify
-     *	@param	int		$idwarehouse	Id warehouse to use for stock change.
-     *	@return	int						<0 if KO, >0 if OK
+     * 	@param      User	$user       Objet user that close
+     *	@return		int					<0 if KO, >0 if OK
      */
-    function acceptedEstimate($user, $idwarehouse=-1)
+    function cloture($user)
     {
-        global $conf,$langs;
+        global $conf, $langs;
 
         $error=0;
 
-        // Protection
-        if ($this->repair_statut != 3)
+        if ($user->rights->repair->cloturer)
         {
-			dol_syslog(get_class($this)."::acceptedEstimate wrong status ".$this->repair_statut, LOG_WARNING);
-            return 0;
-        }
+            $this->db->begin();
 
-        if (! $user->rights->repair->ValidateReplies)
-        {
+            $now=dol_now();
+
+            $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
+            $sql.= ' SET fk_statut = 3,';
+            $sql.= ' on_process = 0,';
+            $sql.= ' fk_user_cloture = '.$user->id.',';
+            $sql.= ' date_cloture = '.$this->db->idate($now);
+            $sql.= ' WHERE rowid = '.$this->id.' AND fk_statut > 0';
+        	dol_syslog(get_class($this)."::cloture sql=".$sql, LOG_DEBUG);
+            if ($this->db->query($sql))
+            {
+                // Appel des triggers
+                include_once DOL_DOCUMENT_ROOT . '/core/class/interfaces.class.php';
+                $interface=new Interfaces($this->db);
+                $result=$interface->run_triggers('REPAIR_CLOSE',$this,$user,$langs,$conf);
+                if ($result < 0) { $error++; $this->errors=$interface->errors; }
+                // Fin appel triggers
+
+                if (! $error)
+                {
+            		$this->statut=3;
+            		$this->on_process=0;
+            		$this->db->commit();
+                    return 1;
+                }
+                else
+                {
+                    $this->db->rollback();
+                    return -1;
+                }
+            }
+            else
+            {
+                $this->error=$this->db->lasterror();
+                dol_syslog($this->error, LOG_ERR);
+
+                $this->db->rollback();
+                return -1;
+            }
+        }
+		else
+		{
             $this->error='Permission denied';
             return -1;
-        }
-
-		$now=dol_now();
-
-        $this->db->begin();
-
-        $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-        $sql.= " SET";
-		$sql.= " fk_statut = 1,";
-        $sql.= " repair_statut = 4,";
-        $sql.= " date_reply_e = '".$now."',";
-        $sql.= " fk_user_reply_e = ".$user->id;
-        $sql.= " WHERE rowid = ".$this->id;
-
-        dol_syslog(get_class($this)."::acceptedEstimate sql=".$sql, LOG_DEBUG);
-        if ($this->db->query($sql))
-        {
-            $this->statut=1;
-            $this->repair_statut=4;
-            $this->db->commit();
-            return 1;
-        }
-        else
-        {
-            $this->error=$this->db->error();
-            $this->db->rollback();
-            dol_syslog($this->error, LOG_ERR);
-            return -1;
-        }
+		}
     }
 
     /**
-     *	Refused Estimate
+     *	Cancel Repair
      *
      *	@param	User	$user			Object user that modify
      *	@param	int		$idwarehouse	Id warehouse to use for stock change.
      *	@return	int						<0 if KO, >0 if OK
      */
-    function refusedEstimate($user, $idwarehouse=-1)
+    function cancel($idwarehouse=-1)
     {
-        global $conf,$langs;
+        global $conf,$user,$langs;
 
         $error=0;
 
-        // Protection
-        if ($this->repair_statut != 3)
-        {
-			dol_syslog(get_class($this)."::refusedEstimate wrong status ".$this->repair_statut, LOG_WARNING);
-            return 0;
-        }
-
-        if (! $user->rights->repair->ValidateReplies)
+        if (! $user->rights->repair->MakeRepair)
         {
             $this->error='Permission denied';
             return -1;
         }
 
-		$now=dol_now();
-
         $this->db->begin();
 
         $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-        $sql.= " SET";
-		$sql.= " fk_statut = 3,";
-        $sql.= " repair_statut = -2,";
-        $sql.= " date_reply_e = '".$now."',";
-        $sql.= " fk_user_reply_e = ".$user->id;
+        $sql.= " SET fk_statut = -1,";
+        $sql.= " on_process = 0";
         $sql.= " WHERE rowid = ".$this->id;
+		$sql.= " AND fk_statut = 1";
 
-        dol_syslog(get_class($this)."::refusedEstimate sql=".$sql, LOG_DEBUG);
+        dol_syslog(get_class($this)."::cancel sql=".$sql, LOG_DEBUG);
         if ($this->db->query($sql))
         {
-            $this->statut=3;
-            $this->repair_statut=-2;
-            $this->db->commit();
-            return 1;
-        }
+			// If stock is decremented on validate order, we must reincrement it
+			if (! empty($conf->stock->enabled) && $conf->global->STOCK_CALCULATE_ON_VALIDATE_ORDER == 1)
+			{
+				require_once DOL_DOCUMENT_ROOT.'/product/stock/class/mouvementstock.class.php';
+				$langs->load("agenda");
+
+				$num=count($this->lines);
+				for ($i = 0; $i < $num; $i++)
+				{
+					if ($this->lines[$i]->fk_product > 0)
+					{
+						$mouvP = new MouvementStock($this->db);
+						// We increment stock of product (and sub-products)
+						$result=$mouvP->reception($user, $this->lines[$i]->fk_product, $idwarehouse, $this->lines[$i]->qty, $this->lines[$i]->subprice, $langs->trans("OrderCanceledInDolibarr",$this->ref));
+						if ($result < 0) {
+							$error++;
+						}
+					}
+				}
+			}
+
+			if (! $error)
+			{
+				// Appel des triggers
+				include_once DOL_DOCUMENT_ROOT . '/core/class/interfaces.class.php';
+				$interface=new Interfaces($this->db);
+				$result=$interface->run_triggers('REPAIR_CANCEL',$this,$user,$langs,$conf);
+				if ($result < 0) {
+					$error++; $this->errors=$interface->errors;
+				}
+				// Fin appel triggers
+			}
+
+            if (! $error)
+			{
+				$this->statut=-1;
+            	$this->on_process=0;
+            	$this->db->commit();
+            	return 1;
+        	}
+			else
+			{
+				$this->error=$mouvP->error;
+				$this->db->rollback();
+				return -1;
+			}
+		}
         else
         {
             $this->error=$this->db->error();
@@ -793,56 +617,34 @@ class Repair extends CommonObject
         }
     }
 
-    /**
-     *	Unvalid Estimate
-     *
-     *	@param	User	$user			Object user that modify
-     *	@param	int		$idwarehouse	Id warehouse to use for stock change.
-     *	@return	int						<0 if KO, >0 if OK
-     */
-    function unvalidEstimate($user, $idwarehouse=-1)
-    {
-        global $conf,$langs;
 
-        $error=0;
 
-        // Protection
-        if ($this->repair_statut != 3)
-        {
-			dol_syslog(get_class($this)."::unvalidEstimate wrong status ".$this->repair_statut, LOG_WARNING);
-            return 0;
-        }
 
-        if (! $user->rights->repair->ValidateReplies)
-        {
-            $this->error='Permission denied';
-            return -1;
-        }
 
-        $this->db->begin();
 
-        $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-        $sql.= " SET";
-		$sql.= " fk_statut = 1,";
-        $sql.= " repair_statut = 2";
-        $sql.= " WHERE rowid = ".$this->id;
 
-        dol_syslog(get_class($this)."::unvalidEstimate sql=".$sql, LOG_DEBUG);
-        if ($this->db->query($sql))
-        {
-            $this->statut=1;
-            $this->repair_statut=2;
-            $this->db->commit();
-            return 1;
-        }
-        else
-        {
-            $this->error=$this->db->error();
-            $this->db->rollback();
-            dol_syslog($this->error, LOG_ERR);
-            return -1;
-        }
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     /**
      *	Make Repair
@@ -998,145 +800,6 @@ class Repair extends CommonObject
     }
 
     /**
-     *	Cancel Repair
-     *
-     *	@param	User	$user			Object user that modify
-     *	@param	int		$idwarehouse	Id warehouse to use for stock change.
-     *	@return	int						<0 if KO, >0 if OK
-     */
-    function cancelRepair($user, $idwarehouse=-1)
-    {
-        global $conf,$langs;
-
-        $error=0;
-
-        // Protection
-        if ($this->repair_statut != 5)
-        {
-			dol_syslog(get_class($this)."::cancelRepair wrong status ".$this->repair_statut, LOG_WARNING);
-            return 0;
-        }
-
-        if (! $user->rights->repair->MakeRepair)
-        {
-            $this->error='Permission denied';
-            return -1;
-        }
-
-        $this->db->begin();
-
-        $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-        $sql.= " SET";
-		$sql.= " fk_statut = 1,";
-        $sql.= " repair_statut = 4";
-        $sql.= " WHERE rowid = ".$this->id;
-
-        dol_syslog(get_class($this)."::cancelRepair sql=".$sql, LOG_DEBUG);
-        if ($this->db->query($sql))
-        {
-            $this->statut=1;
-            $this->repair_statut=4;
-            $this->db->commit();
-            return 1;
-        }
-        else
-        {
-            $this->error=$this->db->error();
-            $this->db->rollback();
-            dol_syslog($this->error, LOG_ERR);
-            return -1;
-        }
-    }
-
-    /**
-     *	Validate Repair
-     *
-     *	@param	User	$user			Object user that modify
-     *	@param	int		$idwarehouse	Id warehouse to use for stock change.
-     *	@return	int						<0 if KO, >0 if OK
-     */
-    function validateRepair($user, $idwarehouse=-1)
-    {
-        global $conf,$langs;
-
-        $error=0;
-
-        // Protection
-        if ($this->repair_statut != 6)
-        {
-			dol_syslog(get_class($this)."::validateRepair wrong status ".$this->repair_statut, LOG_WARNING);
-            return 0;
-        }
-
-        if (! $user->rights->repair->ValidateRepair)
-        {
-            $this->error='Permission denied';
-            return -1;
-        }
-
-		$now = dol_now();
-
-        $this->db->begin();
-
-        $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-        $sql.= " SET";
-        $sql.= " fk_statut = 1,";
-        $sql.= " repair_statut = 7,";
-        $sql.= " date_valid_r='".$this->db->idate($now)."',";
-        $sql.= " fk_user_valid_r = ".$user->id;
-        $sql.= " WHERE rowid = ".$this->id;
-
-        dol_syslog(get_class($this)."::validaterepair sql=".$sql, LOG_DEBUG);
-		
-		$resql=$this->db->query($sql);
-		if (!$resql)
-        {
-            dol_syslog(get_class($this)."::validaterepair Echec update - 10 - sql=".$sql, LOG_ERR);
-            dol_print_error($this->db);
-            $error++;
-        }
-//TODO Verifier la gestion des stock
-        if (! $error)
-        {
-            // If stock is incremented on validate order, we must increment it
-            if ($result >= 0 && $conf->stock->enabled && $conf->global->STOCK_CALCULATE_ON_VALIDATE_ORDER == 1)
-            {
-                require_once(DOL_DOCUMENT_ROOT."/product/stock/class/mouvementstock.class.php");
-                $langs->load("agenda");
-
-                // Loop on each line
-                $cpt=count($this->lines);
-                for ($i = 0; $i < $cpt; $i++)
-                {
-                    if ($this->lines[$i]->fk_product > 0)
-                    {
-                        $mouvP = new MouvementStock($this->db);
-                        // We decrement stock of product (and sub-products)
-                        $result=$mouvP->livraison($user, $this->lines[$i]->fk_product, $idwarehouse, $this->lines[$i]->qty, $this->lines[$i]->subprice, $langs->trans("RepairValidatedInDolibarr",$num));
-                        if ($result < 0) { $error++; }
-                    }
-                }
-            }
-        }
-
-        // Set current status
-        if (! $error)
-        {
-            $this->statut=1;
-            $this->repair_statut=7;
-            $this->db->commit();
-            return 1;
-        }
-        else
-        {
-            $this->error=$this->db->error();
-            $this->db->rollback();
-            dol_syslog($this->error, LOG_ERR);
-            return -1;
-        }
-    }
-
-    /**
      *	Modify Repair
      *
      *	@param	User	$user			Object user that modify
@@ -1186,80 +849,6 @@ class Repair extends CommonObject
             return -1;
         }
     }
-
-    /**
-     *  Close order
-     *
-     * 	@param      User	$user       Objet user that close
-     *	@return		int					<0 if KO, >0 if OK
-     */
-    function cloture($user)
-    {
-        global $conf, $langs;
-
-        $error=0;
-
-		// Protection
-        if ($this->repair_statut != 7)
-        {
-			dol_syslog(get_class($this)."::cloture wrong status ".$this->repair_statut, LOG_WARNING);
-            return 0;
-        }
-
-        if ($user->rights->repair->cloturer)
-        {
-            $this->db->begin();
-
-            $now=dol_now();
-
-            $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
-            $sql.= ' SET';
-            $sql.= ' fk_statut = 3,';
-            $sql.= ' repair_statut = 8,';
-            $sql.= ' fk_user_cloture = '.$user->id.',';
-            $sql.= ' date_cloture = '.$this->db->idate($now);
-            $sql.= ' WHERE rowid = '.$this->id;
-
-        	dol_syslog(get_class($this)."::cloture sql=".$sql, LOG_DEBUG);
-            if ($this->db->query($sql))
-            {
-                // Appel des triggers
-                include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
-                $interface=new Interfaces($this->db);
-                $result=$interface->run_triggers('REPAIR_CLOSE',$this,$user,$langs,$conf);
-                if ($result < 0) { $error++; $this->errors=$interface->errors; }
-                // Fin appel triggers
-
-                if (! $error)
-                {
-
-            		$this->statut=3;
-            		$this->repair_statut=8;
-            		$this->db->commit();
-                    return 1;
-                }
-                else
-                {
-                    $this->db->rollback();
-                    return -1;
-                }
-            }
-            else
-            {
-                $this->error=$this->db->lasterror();
-                dol_syslog($this->error, LOG_ERR);
-
-                $this->db->rollback();
-                return -1;
-            }
-        }
-		else
-		{
-            $this->error='Permission denied';
-            return -1;
-		}
-    }
-
     /**
      *	Unvalide Repair
      *
@@ -1311,156 +900,6 @@ class Repair extends CommonObject
         }
     }
 
-    /**
-     * 	Cancel an order
-     * 	If stock is decremented on order validation, we must reincrement it
-     *
-     *	@param	User	$user			Object user
-     *	@param	int		$idwarehouse	Id warehouse to use for stock change.
-     *	@return	int						<0 if KO, >0 if OK
-     */
-    function cancel($user, $idwarehouse=-1)
-    {
-        global $conf,$langs;
-
-        $error=0;
-
-		// Protection
-        if ( ($this->repair_statut < 0) || ($this->repair_statut == 8) )
-        {
-			dol_syslog(get_class($this)."::cancel wrong status ".$this->repair_statut, LOG_WARNING);
-            return 0;
-        }
-
-        if ($user->rights->repair->annuler)
-        {
-            $this->db->begin();
-
-            $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-            $sql.= " SET";
-            $sql.= " fk_statut = -1,";
-            $sql.= " repair_statut = -1";
-            $sql.= " WHERE rowid = ".$this->id;
-            $sql.= " AND fk_statut >= 0";
-			$sql.= " AND fk_statut < 8";
-
-            dol_syslog("Repair::cancel sql=".$sql, LOG_DEBUG);
-            if ($this->db->query($sql))
-            {
-                // If stock is decremented on validate order, we must reincrement it
-                if ($conf->stock->enabled && $conf->global->STOCK_CALCULATE_ON_VALIDATE_ORDER == 1)
-                {
-	                require_once(DOL_DOCUMENT_ROOT."/product/stock/class/mouvementstock.class.php");
-	                $langs->load("agenda");
-
-	                $num=count($this->lines);
-	                for ($i = 0; $i < $num; $i++)
-	                {
-	                    if ($this->lines[$i]->fk_product > 0)
-	                    {
-	                        $mouvP = new MouvementStock($this->db);
-	                        // We increment stock of product (and sub-products)
-	                        $result=$mouvP->reception($user, $this->lines[$i]->fk_product, $idwarehouse, $this->lines[$i]->qty, $this->lines[$i]->subprice, $langs->trans("RepairCanceledInDolibarr",$this->ref));
-	                        if ($result < 0) { $error++; }
-	                    }
-	                }
-                }
-
-                if (! $error)
-                {
-                    // Appel des triggers
-                    include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
-                    $interface=new Interfaces($this->db);
-                    $result=$interface->run_triggers('ORDER_CANCEL',$this,$user,$langs,$conf);
-                    if ($result < 0) { $error++; $this->errors=$interface->errors; }
-                    // Fin appel triggers
-                }
-
-                if (! $error)
-                {
-                    $this->statut=-1;
-                    $this->repair_statut=-1;
-                    $this->db->commit();
-                    return 1;
-                }
-                else
-                {
-                    $this->error=$mouvP->error;
-                    $this->db->rollback();
-                    return -1;
-                }
-            }
-            else
-            {
-                $this->error=$this->db->error();
-                $this->db->rollback();
-                dol_syslog($this->error, LOG_ERR);
-                return -1;
-            }
-        }
-		else
-		{
-            $this->error='Permission denied';
-            return -1;
-		}
-    }
-
-    /**
-     *	Tag the order as validated (opened)
-     *	Function used when order is reopend after being closed.
-     *
-     *	@param      User	$user       Object user that change status
-     *	@return     int         		<0 if KO, 0 if nothing is done, >0 if OK
-     */
-    function set_reopen($user)
-    {
-        global $conf,$langs;
-        $error=0;
-
-        if ($this->repair_statut != 8)
-        {
-			dol_syslog(get_class($this)."::cancel wrong status ".$this->repair_statut, LOG_WARNING);
-            return 0;
-        }
-
-        $this->db->begin();
-
-        $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
-        $sql.= ' SET fk_statut=1, repair_statut=7, facture=0';
-        $sql.= ' WHERE rowid = '.$this->id;
-
-        dol_syslog("Repair::set_reopen sql=".$sql);
-        $resql = $this->db->query($sql);
-        if ($resql)
-        {
-            // Appel des triggers
-            include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
-            $interface=new Interfaces($this->db);
-            $result=$interface->run_triggers('BILL_REOPEN',$this,$user,$langs,$conf);
-            if ($result < 0) { $error++; $this->errors=$interface->errors; }
-            // Fin appel triggers
-        }
-        else
-        {
-            $error++;
-            $this->error=$this->db->error();
-            dol_print_error($this->db);
-        }
-
-        if (! $error)
-        {
-            $this->statut=1;
-            $this->repair_statut=7;
-			$this->facture=0;
-            $this->db->commit();
-            return 1;
-        }
-        else
-        {
-            $this->db->rollback();
-            return -1;
-        }
-    }
 
     /**
      *	Reopen Canceled Repair
@@ -1714,84 +1153,7 @@ class Repair extends CommonObject
         }
     }
 */
-    /**
-     *	Set draft status
-     *
-     *	@param	User	$user			Object user that modify
-     *	@param	int		$idwarehouse	Id warehouse to use for stock change.
-     *	@return	int						<0 if KO, >0 if OK
-     */
-    function set_draft($user, $idwarehouse=-1)
-    {
-        global $conf,$langs;
 
-        $error=0;
-
-        // Protection
-        if ($this->statut <= 0)
-        {
-            return 0;
-        }
-
-        if (! $user->rights->repair->valider)
-        {
-            $this->error='Permission denied';
-            return -1;
-        }
-
-        $this->db->begin();
-
-        $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-        $sql.= " SET fk_statut = 0";
-        $sql.= " WHERE rowid = ".$this->id;
-
-        dol_syslog(get_class($this)."::set_draft sql=".$sql, LOG_DEBUG);
-        if ($this->db->query($sql))
-        {
-            // If stock is decremented on validate order, we must reincrement it
-            if ($conf->stock->enabled && $conf->global->STOCK_CALCULATE_ON_VALIDATE_ORDER == 1)
-            {
-                require_once(DOL_DOCUMENT_ROOT."/product/stock/class/mouvementstock.class.php");
-                $langs->load("agenda");
-
-                $num=count($this->lines);
-                for ($i = 0; $i < $num; $i++)
-                {
-                    if ($this->lines[$i]->fk_product > 0)
-                    {
-                        $mouvP = new MouvementStock($this->db);
-                        // We increment stock of product (and sub-products)
-                        $result=$mouvP->reception($user, $this->lines[$i]->fk_product, $idwarehouse, $this->lines[$i]->qty, $this->lines[$i]->subprice, $langs->trans("RepairBackToDraftInDolibarr",$this->ref));
-                        if ($result < 0) { $error++; }
-                    }
-                }
-
-                if (!$error)
-                {
-                    $this->statut=0;
-                    $this->db->commit();
-                    return $result;
-                }
-                else
-                {
-                    $this->error=$mouvP->error;
-                    $this->db->rollback();
-                    return $result;
-                }
-            }
-
-            $this->statut=0;
-            $this->db->commit();
-            return 1;
-        }
-        else
-        {
-            $this->error=$this->db->error();
-            $this->db->rollback();
-            dol_syslog($this->error, LOG_ERR);
-            return -1;
-        }
-    }
 
     /**
      *	Create repair
@@ -1936,10 +1298,10 @@ class Repair extends CommonObject
                 // Mise a jour ref
 //<Tathar>
 				$this->date = $date;
-//				$ref = $this->getNextNumRef($soc);
 //</Tathar>
-				$ref = $this->getNextNumRef($soc);
-                $sql = 'UPDATE '.MAIN_DB_PREFIX."repair SET ref='".$ref."' WHERE rowid=".$this->id;
+//				$ref = $this->getNextNumRef($soc);
+//                $sql = 'UPDATE '.MAIN_DB_PREFIX."repair SET ref='".$ref."' WHERE rowid=".$this->id;
+				$sql = 'UPDATE '.MAIN_DB_PREFIX."repair SET ref='(PROV".$this->id.")' WHERE rowid=".$this->id;
 				dol_syslog(get_class($this)."::create update NumRef sql=".$sql);
                 if ($this->db->query($sql))
                 {
