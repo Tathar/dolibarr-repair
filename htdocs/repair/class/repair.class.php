@@ -1620,6 +1620,562 @@ class Repair extends CommonOrder
         return $nb;
     }
 
+    /**
+     * 	Applique une remise relative
+     *
+     * 	@param     	User		$user		User qui positionne la remise
+     * 	@param     	float		$remise		Discount (percent)
+     *	@return		int 					<0 if KO, >0 if OK
+     */
+    function set_remise($user, $remise)
+    {
+        $remise=trim($remise)?trim($remise):0;
+
+        if ($user->rights->repair->creer)
+        {
+            $remise=price2num($remise);
+
+            $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
+            $sql.= ' SET remise_percent = '.$remise;
+            $sql.= ' WHERE rowid = '.$this->id.' AND fk_statut = 0 ;';
+
+            if ($this->db->query($sql))
+            {
+                $this->remise_percent = $remise;
+                $this->update_price(1);
+                return 1;
+            }
+            else
+            {
+                $this->error=$this->db->error();
+                return -1;
+            }
+        }
+    }
+
+
+    /**
+     * 		Applique une remise absolue
+     *
+     * 		@param     	User		$user 		User qui positionne la remise
+     * 		@param     	float		$remise		Discount
+     *		@return		int 					<0 if KO, >0 if OK
+     */
+    function set_remise_absolue($user, $remise)
+    {
+        $remise=trim($remise)?trim($remise):0;
+
+        if ($user->rights->repair->creer)
+        {
+            $remise=price2num($remise);
+
+            $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
+            $sql.= ' SET remise_absolue = '.$remise;
+            $sql.= ' WHERE rowid = '.$this->id.' AND fk_statut = 0 ;';
+
+            dol_syslog("Repair::set_remise_absolue sql=$sql");
+
+            if ($this->db->query($sql))
+            {
+                $this->remise_absolue = $remise;
+                $this->update_price(1);
+                return 1;
+            }
+            else
+            {
+                $this->error=$this->db->error();
+                return -1;
+            }
+        }
+    }
+
+
+    /**
+     *	Set the order date
+     *
+     *	@param      User		$user       Object user making change
+     *	@param      timestamp	$date		Date
+     *	@return     int         			<0 if KO, >0 if OK
+     */
+    function set_date($user, $date)
+    {
+        if ($user->rights->repair->creer)
+        {
+            $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
+            $sql.= " SET date_repair = ".($date ? $this->db->idate($date) : 'null');
+            $sql.= " WHERE rowid = ".$this->id." AND fk_statut = 0";
+
+            dol_syslog("Repair::set_date sql=$sql",LOG_DEBUG);
+            $resql=$this->db->query($sql);
+            if ($resql)
+            {
+                $this->date = $date;
+                return 1;
+            }
+            else
+            {
+                $this->error=$this->db->error();
+                dol_syslog("Repair::set_date ".$this->error,LOG_ERR);
+                return -1;
+            }
+        }
+        else
+        {
+            return -2;
+        }
+    }
+
+    /**
+     *	Set the planned delivery date
+     *
+     *	@param      User			$user        		Objet utilisateur qui modifie
+     *	@param      timestamp		$date_livraison     Date de livraison
+     *	@return     int         						<0 si ko, >0 si ok
+     */
+    function set_date_livraison($user, $date_livraison)
+    {
+        if ($user->rights->repair->creer)
+        {
+            $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
+            $sql.= " SET date_livraison = ".($date_livraison ? "'".$this->db->idate($date_livraison)."'" : 'null');
+            $sql.= " WHERE rowid = ".$this->id;
+
+            dol_syslog("Repair::set_date_livraison sql=".$sql,LOG_DEBUG);
+            $resql=$this->db->query($sql);
+            if ($resql)
+            {
+                $this->date_livraison = $date_livraison;
+                return 1;
+            }
+            else
+            {
+                $this->error=$this->db->error();
+                dol_syslog("Repair::set_date_livraison ".$this->error,LOG_ERR);
+                return -1;
+            }
+        }
+        else
+        {
+            return -2;
+        }
+    }
+
+    /**
+     *	Set availability
+     *
+     *	@param      User	$user		Object user making change
+     *	@param      int		$id			If of availability delay
+     *	@return     int           		<0 if KO, >0 if OK
+     */
+    function set_availability($user, $id)
+    {
+        if ($user->rights->repair->creer)
+        {
+            $sql = "UPDATE ".MAIN_DB_PREFIX."repair ";
+            $sql.= " SET fk_availability = '".$id."'";
+            $sql.= " WHERE rowid = ".$this->id;
+
+            if ($this->db->query($sql))
+            {
+                $this->fk_availability = $id;
+                return 1;
+            }
+            else
+            {
+                $this->error=$this->db->error();
+                dol_syslog("Repair::set_availability Erreur SQL");
+                return -1;
+            }
+        }
+    }
+
+    /**
+     *	Set source of demand
+     *
+     *	@param      User	$user		  	Object user making change
+     *	@param      int		$id				Id of source
+     *	@return     int           			<0 if KO, >0 if OK
+     */
+    function set_demand_reason($user, $id)
+    {
+        if ($user->rights->repair->creer)
+        {
+            $sql = "UPDATE ".MAIN_DB_PREFIX."repair ";
+            $sql.= " SET fk_input_reason = '".$id."'";
+            $sql.= " WHERE rowid = ".$this->id;
+
+            if ($this->db->query($sql))
+            {
+                $this->fk_input_reason = $id;
+                return 1;
+            }
+            else
+            {
+                $this->error=$this->db->error();
+                dol_syslog("Repair::set_demand_reason Erreur SQL");
+                return -1;
+            }
+        }
+    }
+
+    /**
+     *  Return list of orders (eventuelly filtered on a user) into an array
+     *
+     *  @param      int		$brouillon      0=non brouillon, 1=brouillon
+     *  @param      User	$user           Objet user de filtre
+     *  @return     int             		-1 if KO, array with result if OK
+     */
+    function liste_array($brouillon=0, $user='')
+    {
+        global $conf;
+
+        $ga = array();
+
+        $sql = "SELECT s.nom, s.rowid, c.rowid, c.ref";
+        $sql.= " FROM ".MAIN_DB_PREFIX."societe as s, ".MAIN_DB_PREFIX."repair as c";
+        $sql.= " WHERE c.entity = ".$conf->entity;
+        $sql.= " AND c.fk_soc = s.rowid";
+        if ($brouillon) $sql.= " AND c.fk_statut = 0";
+        if ($user) $sql.= " AND c.fk_user_author <> ".$user->id;
+        $sql .= " ORDER BY c.date_repair DESC";
+
+        $result=$this->db->query($sql);
+        if ($result)
+        {
+            $numc = $this->db->num_rows($result);
+            if ($numc)
+            {
+                $i = 0;
+                while ($i < $numc)
+                {
+                    $obj = $this->db->fetch_object($result);
+
+                    $ga[$obj->rowid] = $obj->ref;
+                    $i++;
+                }
+            }
+            return $ga;
+        }
+        else
+        {
+            dol_print_error($this->db);
+            return -1;
+        }
+    }
+
+    /**
+     *	Change le delai de livraison
+     *
+     *	@param      int		$availability_id	Id du nouveau mode
+     *	@return     int         				>0 if OK, <0 if KO
+     */
+    function availability($availability_id)
+    {
+        dol_syslog('Repair::availability('.$availability_id.')');
+        if ($this->statut >= 0)
+        {
+            $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
+            $sql .= ' SET fk_availability = '.$availability_id;
+            $sql .= ' WHERE rowid='.$this->id;
+            if ( $this->db->query($sql) )
+            {
+                $this->availability_id = $availability_id;
+                return 1;
+            }
+            else
+            {
+                dol_syslog('Repair::availability Erreur '.$sql.' - '.$this->db->error(), LOG_ERR);
+                $this->error=$this->db->lasterror();
+                return -1;
+            }
+        }
+        else
+        {
+            dol_syslog('Repair::availability, etat facture incompatible', LOG_ERR);
+            $this->error='Etat repair incompatible '.$this->statut;
+            return -2;
+        }
+    }
+
+    /**
+     *	Change la source de la demande
+     *
+     *  @param      int		$demand_reason_id	Id of new demand
+     *  @return     int        			 		>0 if ok, <0 if ko
+     */
+    function demand_reason($demand_reason_id)
+    {
+        dol_syslog('Repair::demand_reason('.$demand_reason_id.')');
+        if ($this->statut >= 0)
+        {
+            $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
+            $sql .= ' SET fk_input_reason = '.$demand_reason_id;
+            $sql .= ' WHERE rowid='.$this->id;
+            if ( $this->db->query($sql) )
+            {
+                $this->demand_reason_id = $demand_reason_id;
+                return 1;
+            }
+            else
+            {
+                dol_syslog('Repair::demand_reason Erreur '.$sql.' - '.$this->db->error(), LOG_ERR);
+                $this->error=$this->db->lasterror();
+                return -1;
+            }
+        }
+        else
+        {
+            dol_syslog('Repair::demand_reason, etat facture incompatible', LOG_ERR);
+            $this->error='Etat repair incompatible '.$this->statut;
+            return -2;
+        }
+    }
+
+    /**
+     *	Set customer ref
+     *
+     *	@param      User	$user           User that make change
+     *	@param      string	$ref_client     Customer ref
+     *	@return     int             		<0 if KO, >0 if OK
+     */
+    function set_ref_client($user, $ref_client)
+    {
+        if ($user->rights->repair->creer)
+        {
+            dol_syslog('Repair::set_ref_client this->id='.$this->id.', ref_client='.$ref_client);
+
+            $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair SET';
+            $sql.= ' ref_client = '.(empty($ref_client) ? 'NULL' : '\''.$this->db->escape($ref_client).'\'');
+            $sql.= ' WHERE rowid = '.$this->id;
+
+            if ($this->db->query($sql) )
+            {
+                $this->ref_client = $ref_client;
+                return 1;
+            }
+            else
+            {
+                $this->error=$this->db->lasterror();
+                dol_syslog('Repair::set_ref_client Erreur '.$this->error.' - '.$sql, LOG_ERR);
+                return -2;
+            }
+        }
+        else
+        {
+            return -1;
+        }
+    }
+
+	/**
+	 * Classify the order as invoiced
+	 *
+	 * @return     int     <0 if ko, >0 if ok
+	 */
+	function classifyBilled()
+	{
+		global $conf, $user, $langs;
+
+		$this->db->begin();
+
+		$sql = 'UPDATE '.MAIN_DB_PREFIX.'repair SET facture = 1';
+		$sql.= ' WHERE rowid = '.$this->id.' AND fk_statut > 0';
+
+		dol_syslog(get_class($this)."::classifyBilled sql=".$sql, LOG_DEBUG);
+		if ($this->db->query($sql))
+		{
+			// Appel des triggers
+			include_once DOL_DOCUMENT_ROOT . '/core/class/interfaces.class.php';
+			$interface=new Interfaces($this->db);
+			$result=$interface->run_triggers('REPAIR_CLASSIFY_BILLED',$this,$user,$langs,$conf);
+			if ($result < 0) {
+				$error++; $this->errors=$interface->errors;
+			}
+			// Fin appel triggers
+
+			if (! $error)
+			{
+				$this->facturee=1; // deprecated
+				$this->billed=1;
+
+				$this->db->commit();
+				return 1;
+			}
+			else
+			{
+				$this->error=$this->db->error();
+				dol_syslog(get_class($this)."::classifyBilled ".$this->error, LOG_ERR);
+				$this->db->rollback();
+				return -2;
+			}
+		}
+		else
+		{
+			$this->error=$this->db->error();
+            dol_syslog(get_class($this)."::classifyBilled Error ".$this->error, LOG_ERR);
+            $this->db->rollback();
+			return -1;
+		}
+	}
+
+    /**
+     *	Classify the order as invoiced
+     *
+     *	@return     int     <0 if ko, >0 if ok
+     */
+    function classer_facturee()
+    {
+        return $this->classifyBilled();
+    }
+
+
+    /**
+     *  Update a line in database
+     *
+     *  @param    	int				$rowid            	Id of line to update
+     *  @param    	string			$desc             	Description de la ligne
+     *  @param    	double			$pu               	Prix unitaire
+     *  @param    	double			$qty              	Quantity
+     *  @param    	double			$remise_percent   	Pourcentage de remise de la ligne
+     *  @param    	double			$txtva           	Taux TVA
+     * 	@param		double			$txlocaltax1		Local tax 1 rate
+     *  @param		double			$txlocaltax2		Local tax 2 rate
+     *  @param    	string			$price_base_type	HT or TTC
+     *  @param    	int				$info_bits        	Miscellaneous informations on line
+     *  @param    	timestamp		$date_start        	Start date of the line
+     *  @param    	timestamp		$date_end          	End date of the line
+     * 	@param		int				$type				Type of line (0=product, 1=service)
+     *  @param		int				$fk_parent_line		Id of parent line (0 in most cases, used by modules adding sublevels into lines).
+     *  @param		int				$skip_update_total	Keep fields total_xxx to 0 (used for special lines by some modules)
+     *  @param		int				$fk_fournprice		Id of origin supplier price
+     *  @param		int				$pa_ht				Price (without tax) of product when it was bought
+     *  @param		string			$label				Label
+     *  @param		int				$special_code		Special code (also used by externals modules!)
+     *  @return   	int              					< 0 if KO, > 0 if OK
+     */
+    function updateline($rowid, $desc, $pu, $qty, $remise_percent, $txtva, $txlocaltax1=0,$txlocaltax2=0, $price_base_type='HT', $info_bits=0, $date_start='', $date_end='', $type=0, $fk_parent_line=0, $skip_update_total=0, $fk_fournprice=null, $pa_ht=0, $label='', $special_code=0)
+    {
+        global $conf;
+
+        dol_syslog(get_class($this)."::Updateline $rowid, $desc, $pu, $qty, $remise_percent, $txtva, $txlocaltax1, $txlocaltax2, $price_base_type, $info_bits, $date_start, $date_end, $type");
+        include_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
+
+        if (! empty($this->brouillon))
+        {
+            $this->db->begin();
+
+            // Clean parameters
+            if (empty($qty)) $qty=0;
+            if (empty($info_bits)) $info_bits=0;
+            if (empty($txtva)) $txtva=0;
+            if (empty($txlocaltax1)) $txlocaltax1=0;
+            if (empty($txlocaltax2)) $txlocaltax2=0;
+            if (empty($remise)) $remise=0;
+            if (empty($remise_percent)) $remise_percent=0;
+            if (empty($special_code) || $special_code == 3) $special_code=0;
+            $remise_percent=price2num($remise_percent);
+            $qty=price2num($qty);
+            $pu = price2num($pu);
+      		$pa_ht=price2num($pa_ht);
+            $txtva=price2num($txtva);
+            $txlocaltax1=price2num($txlocaltax1);
+            $txlocaltax2=price2num($txlocaltax2);
+
+            // Calcul du total TTC et de la TVA pour la ligne a partir de
+            // qty, pu, remise_percent et txtva
+            // TRES IMPORTANT: C'est au moment de l'insertion ligne qu'on doit stocker
+            // la part ht, tva et ttc, et ce au niveau de la ligne qui a son propre taux tva.
+            $tabprice=calcul_price_total($qty, $pu, $remise_percent, $txtva, $txlocaltax1, $txlocaltax2, 0, $price_base_type, $info_bits, $type);
+            $total_ht  = $tabprice[0];
+            $total_tva = $tabprice[1];
+            $total_ttc = $tabprice[2];
+            $total_localtax1 = $tabprice[9];
+            $total_localtax2 = $tabprice[10];
+
+            // Anciens indicateurs: $price, $subprice, $remise (a ne plus utiliser)
+            $price = $pu;
+            $subprice = $pu;
+            $remise = 0;
+            if ($remise_percent > 0)
+            {
+                $remise = round(($pu * $remise_percent / 100),2);
+                $price = ($pu - $remise);
+            }
+
+            // Update line
+            $this->line=new RepairLine($this->db);
+
+            // Stock previous line records
+            $staticline=new RepairLine($this->db);
+            $staticline->fetch($rowid);
+            $this->line->oldline = $staticline;
+
+            // Reorder if fk_parent_line change
+            if (! empty($fk_parent_line) && ! empty($staticline->fk_parent_line) && $fk_parent_line != $staticline->fk_parent_line)
+            {
+            	$rangmax = $this->line_max($fk_parent_line);
+            	$this->line->rang = $rangmax + 1;
+            }
+
+            $this->line->rowid=$rowid;
+            $this->line->label=$label;
+            $this->line->desc=$desc;
+            $this->line->qty=$qty;
+            $this->line->tva_tx=$txtva;
+            $this->line->localtax1_tx=$txlocaltax1;
+            $this->line->localtax2_tx=$txlocaltax2;
+            $this->line->remise_percent=$remise_percent;
+            $this->line->subprice=$subprice;
+            $this->line->info_bits=$info_bits;
+            $this->line->special_code=$special_code;
+            $this->line->total_ht=$total_ht;
+            $this->line->total_tva=$total_tva;
+            $this->line->total_localtax1=$total_localtax1;
+            $this->line->total_localtax2=$total_localtax2;
+            $this->line->total_ttc=$total_ttc;
+            $this->line->date_start=$date_start;
+            $this->line->date_end=$date_end;
+            $this->line->product_type=$type;
+            $this->line->fk_parent_line=$fk_parent_line;
+            $this->line->skip_update_total=$skip_update_total;
+
+			// infos marge
+			$this->line->fk_fournprice = $fk_fournprice;
+			$this->line->pa_ht = $pa_ht;
+
+            // TODO deprecated
+            $this->line->price=$price;
+            $this->line->remise=$remise;
+
+            $result=$this->line->update();
+            if ($result > 0)
+            {
+            	// Reorder if child line
+            	if (! empty($fk_parent_line)) $this->line_order(true,'DESC');
+
+                // Mise a jour info denormalisees
+                $this->update_price(1);
+
+                $this->db->commit();
+                return $result;
+            }
+            else
+            {
+                $this->error=$this->db->lasterror();
+        		$this->errors=array($this->db->lasterror());
+                $this->db->rollback();
+                dol_syslog(get_class($this)."::updateline Error=".$this->error, LOG_ERR);
+                return -1;
+            }
+        }
+        else
+        {
+            $this->error=get_class($this)."::updateline Order status makes operation forbidden";
+        	$this->errors=array('OrderStatusMakeOperationForbidden');
+            return -2;
+        }
+    }
+
+
 
 
 
@@ -2569,352 +3125,6 @@ class Repair extends CommonOrder
         }
     }
 
-    /**
-     * 	Applique une remise relative
-     *
-     * 	@param     	User		$user		User qui positionne la remise
-     * 	@param     	float		$remise		Discount (percent)
-     *	@return		int 					<0 if KO, >0 if OK
-     */
-    function set_remise($user, $remise)
-    {
-        $remise=trim($remise)?trim($remise):0;
-
-        if ($user->rights->repair->creer)
-        {
-            $remise=price2num($remise);
-
-            $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
-            $sql.= ' SET remise_percent = '.$remise;
-            $sql.= ' WHERE rowid = '.$this->id.' AND fk_statut = 0 ;';
-
-            if ($this->db->query($sql))
-            {
-                $this->remise_percent = $remise;
-                $this->update_price(1);
-                return 1;
-            }
-            else
-            {
-                $this->error=$this->db->error();
-                return -1;
-            }
-        }
-    }
-
-
-    /**
-     * 		Applique une remise absolue
-     *
-     * 		@param     	User		$user 		User qui positionne la remise
-     * 		@param     	float		$remise		Discount
-     *		@return		int 					<0 if KO, >0 if OK
-     */
-    function set_remise_absolue($user, $remise)
-    {
-        $remise=trim($remise)?trim($remise):0;
-
-        if ($user->rights->repair->creer)
-        {
-            $remise=price2num($remise);
-
-            $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
-            $sql.= ' SET remise_absolue = '.$remise;
-            $sql.= ' WHERE rowid = '.$this->id.' AND fk_statut = 0 ;';
-
-            dol_syslog("Repair::set_remise_absolue sql=$sql");
-
-            if ($this->db->query($sql))
-            {
-                $this->remise_absolue = $remise;
-                $this->update_price(1);
-                return 1;
-            }
-            else
-            {
-                $this->error=$this->db->error();
-                return -1;
-            }
-        }
-    }
-
-
-    /**
-     *	Set the order date
-     *
-     *	@param      User		$user       Object user making change
-     *	@param      timestamp	$date		Date
-     *	@return     int         			<0 if KO, >0 if OK
-     */
-    function set_date($user, $date)
-    {
-        if ($user->rights->repair->creer)
-        {
-            $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-            $sql.= " SET date_repair = ".($date ? $this->db->idate($date) : 'null');
-            $sql.= " WHERE rowid = ".$this->id." AND fk_statut = 0";
-
-            dol_syslog("Repair::set_date sql=$sql",LOG_DEBUG);
-            $resql=$this->db->query($sql);
-            if ($resql)
-            {
-                $this->date = $date;
-                return 1;
-            }
-            else
-            {
-                $this->error=$this->db->error();
-                dol_syslog("Repair::set_date ".$this->error,LOG_ERR);
-                return -1;
-            }
-        }
-        else
-        {
-            return -2;
-        }
-    }
-
-    /**
-     *	Set the planned delivery date
-     *
-     *	@param      User			$user        		Objet utilisateur qui modifie
-     *	@param      timestamp		$date_livraison     Date de livraison
-     *	@return     int         						<0 si ko, >0 si ok
-     */
-    function set_date_livraison($user, $date_livraison)
-    {
-        if ($user->rights->repair->creer)
-        {
-            $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-            $sql.= " SET date_livraison = ".($date_livraison ? "'".$this->db->idate($date_livraison)."'" : 'null');
-            $sql.= " WHERE rowid = ".$this->id;
-
-            dol_syslog("Repair::set_date_livraison sql=".$sql,LOG_DEBUG);
-            $resql=$this->db->query($sql);
-            if ($resql)
-            {
-                $this->date_livraison = $date_livraison;
-                return 1;
-            }
-            else
-            {
-                $this->error=$this->db->error();
-                dol_syslog("Repair::set_date_livraison ".$this->error,LOG_ERR);
-                return -1;
-            }
-        }
-        else
-        {
-            return -2;
-        }
-    }
-
-    /**
-     *	Set availability
-     *
-     *	@param      User	$user		Object user making change
-     *	@param      int		$id			If of availability delay
-     *	@return     int           		<0 if KO, >0 if OK
-     */
-    function set_availability($user, $id)
-    {
-        if ($user->rights->repair->creer)
-        {
-            $sql = "UPDATE ".MAIN_DB_PREFIX."repair ";
-            $sql.= " SET fk_availability = '".$id."'";
-            $sql.= " WHERE rowid = ".$this->id;
-
-            if ($this->db->query($sql))
-            {
-                $this->fk_availability = $id;
-                return 1;
-            }
-            else
-            {
-                $this->error=$this->db->error();
-                dol_syslog("Repair::set_availability Erreur SQL");
-                return -1;
-            }
-        }
-    }
-
-    /**
-     *	Set source of demand
-     *
-     *	@param      User	$user		  	Object user making change
-     *	@param      int		$id				Id of source
-     *	@return     int           			<0 if KO, >0 if OK
-     */
-    function set_demand_reason($user, $id)
-    {
-        if ($user->rights->repair->creer)
-        {
-            $sql = "UPDATE ".MAIN_DB_PREFIX."repair ";
-            $sql.= " SET fk_input_reason = '".$id."'";
-            $sql.= " WHERE rowid = ".$this->id;
-
-            if ($this->db->query($sql))
-            {
-                $this->fk_input_reason = $id;
-                return 1;
-            }
-            else
-            {
-                $this->error=$this->db->error();
-                dol_syslog("Repair::set_demand_reason Erreur SQL");
-                return -1;
-            }
-        }
-    }
-
-    /**
-     *  Return list of orders (eventuelly filtered on a user) into an array
-     *
-     *  @param      int		$brouillon      0=non brouillon, 1=brouillon
-     *  @param      User	$user           Objet user de filtre
-     *  @return     int             		-1 if KO, array with result if OK
-     */
-    function liste_array($brouillon=0, $user='')
-    {
-        global $conf;
-
-        $ga = array();
-
-        $sql = "SELECT s.nom, s.rowid, c.rowid, c.ref";
-        $sql.= " FROM ".MAIN_DB_PREFIX."societe as s, ".MAIN_DB_PREFIX."repair as c";
-        $sql.= " WHERE c.entity = ".$conf->entity;
-        $sql.= " AND c.fk_soc = s.rowid";
-        if ($brouillon) $sql.= " AND c.fk_statut = 0";     //TODO brouillon
-        if ($user) $sql.= " AND c.fk_user_author <> ".$user->id;
-        $sql .= " ORDER BY c.date_repair DESC";
-
-        $result=$this->db->query($sql);
-        if ($result)
-        {
-            $numc = $this->db->num_rows($result);
-            if ($numc)
-            {
-                $i = 0;
-                while ($i < $numc)
-                {
-                    $obj = $this->db->fetch_object($result);
-
-                    $ga[$obj->rowid] = $obj->ref;
-                    $i++;
-                }
-            }
-            return $ga;
-        }
-        else
-        {
-            dol_print_error($this->db);
-            return -1;
-        }
-    }
-
-    /**
-     *	Change le delai de livraison
-     *
-     *	@param      int		$availability_id	Id du nouveau mode
-     *	@return     int         				>0 if OK, <0 if KO
-     */
-    function availability($availability_id)
-    {
-        dol_syslog('Repair::availability('.$availability_id.')');
-        if ($this->statut >= 0)
-        {
-            $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
-            $sql .= ' SET fk_availability = '.$availability_id;
-            $sql .= ' WHERE rowid='.$this->id;
-            if ( $this->db->query($sql) )
-            {
-                $this->availability_id = $availability_id;
-                return 1;
-            }
-            else
-            {
-                dol_syslog('Repair::availability Erreur '.$sql.' - '.$this->db->error(), LOG_ERR);
-                $this->error=$this->db->lasterror();
-                return -1;
-            }
-        }
-        else
-        {
-            dol_syslog('Repair::availability, etat facture incompatible', LOG_ERR);
-            $this->error='Etat repair incompatible '.$this->statut;
-            return -2;
-        }
-    }
-
-    /**
-     *	Change la source de la demande
-     *
-     *  @param      int		$demand_reason_id	Id of new demand
-     *  @return     int        			 		>0 if ok, <0 if ko
-     */
-    function demand_reason($demand_reason_id)
-    {
-        dol_syslog('Repair::demand_reason('.$demand_reason_id.')');
-        if ($this->statut >= 0)
-        {
-            $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
-            $sql .= ' SET fk_input_reason = '.$demand_reason_id;
-            $sql .= ' WHERE rowid='.$this->id;
-            if ( $this->db->query($sql) )
-            {
-                $this->demand_reason_id = $demand_reason_id;
-                return 1;
-            }
-            else
-            {
-                dol_syslog('Repair::demand_reason Erreur '.$sql.' - '.$this->db->error(), LOG_ERR);
-                $this->error=$this->db->lasterror();
-                return -1;
-            }
-        }
-        else
-        {
-            dol_syslog('Repair::demand_reason, etat facture incompatible', LOG_ERR);
-            $this->error='Etat repair incompatible '.$this->statut;
-            return -2;
-        }
-    }
-
-    /**
-     *	Set customer ref
-     *
-     *	@param      User	$user           User that make change
-     *	@param      string	$ref_client     Customer ref
-     *	@return     int             		<0 if KO, >0 if OK
-     */
-    function set_ref_client($user, $ref_client)
-    {
-        if ($user->rights->repair->creer)
-        {
-            dol_syslog('Repair::set_ref_client this->id='.$this->id.', ref_client='.$ref_client);
-
-            $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair SET';
-            $sql.= ' ref_client = '.(empty($ref_client) ? 'NULL' : '\''.$this->db->escape($ref_client).'\'');
-            $sql.= ' WHERE rowid = '.$this->id;
-
-            if ($this->db->query($sql) )
-            {
-                $this->ref_client = $ref_client;
-                return 1;
-            }
-            else
-            {
-                $this->error=$this->db->lasterror();
-                dol_syslog('Repair::set_ref_client Erreur '.$this->error.' - '.$sql, LOG_ERR);
-                return -2;
-            }
-        }
-        else
-        {
-            return -1;
-        }
-    }
-
 //<Tathar>
     /**
      *	Set trademark
@@ -3220,180 +3430,8 @@ class Repair extends CommonOrder
 
 //</Tathar>
 
-    /**
-     *	Classify the order as invoiced
-     *
-     *	@return     int     <0 if ko, >0 if ok
-     */
-    function classer_facturee()
-    {
-        global $conf;
-
-		if ($this->repair_statut < 4)
-        {
-			dol_syslog(get_class($this)."::cancel wrong status ".$this->repair_statut, LOG_WARNING);
-            return 0;
-        }
-
-        $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair SET facture = 1';
-        $sql .= ' WHERE rowid = '.$this->id.' AND repair_statut >= 4 ;';
-		dol_syslog(get_class($this)."::classer_facturee sql=".$sql, LOG_DEBUG);
-        if ($this->db->query($sql) )
-        {
-            if (! empty($conf->propal->enabled) && ! empty($conf->global->PROPALE_CLASSIFIED_INVOICED_WITH_ORDER))
-            {
-                $this->fetchObjectLinked('','propal',$this->id,$this->element);
-                if (! empty($this->linkedObjects))
-                {
-                    foreach($this->linkedObjects['propal'] as $element)
-                    {
-                        $ret=$element->classer_facturee();
-                    }
-                }
-            }
-            return 1;
-        }
-        else
-        {
-            dol_print_error($this->db);
-            return -1;
-        }
-    }
 
 
-    /**
-     *  Update a line in database
-     *
-     *  @param    	int				$rowid            	Id of line to update
-     *  @param    	string			$desc             	Description de la ligne
-     *  @param    	double			$pu               	Prix unitaire
-     *  @param    	double			$qty              	Quantity
-     *  @param    	double			$remise_percent   	Pourcentage de remise de la ligne
-     *  @param    	double			$txtva           	Taux TVA
-     * 	@param		double			$txlocaltax1		Local tax 1 rate
-     *  @param		double			$txlocaltax2		Local tax 2 rate
-     *  @param    	string			$price_base_type	HT or TTC
-     *  @param    	int				$info_bits        	Miscellaneous informations on line
-     *  @param    	timestamp		$date_start        	Start date of the line
-     *  @param    	timestamp		$date_end          	End date of the line
-     * 	@param		int				$type				Type of line (0=product, 1=service)
-     *  @param		int				$fk_parent_line		Parent line id
-     *  @param		int				$skip_update_total	Skip update of total
-     *  @return   	int              					< 0 if KO, > 0 if OK
-     */
-    function updateline($rowid, $desc, $pu, $qty, $remise_percent, $txtva, $txlocaltax1=0,$txlocaltax2=0, $price_base_type='HT', $info_bits=0, $date_start='', $date_end='', $type=0, $fk_parent_line=0, $skip_update_total=0)
-    {
-        global $conf;
-
-        dol_syslog("CustomerRepair::UpdateLine $rowid, $desc, $pu, $qty, $remise_percent, $txtva, $txlocaltax1, $txlocaltax2, $price_base_type, $info_bits, $date_start, $date_end, $type");
-        include_once(DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php');
-
-        if ($this->brouillon)
-        {
-            $this->db->begin();
-
-            // Clean parameters
-            if (empty($qty)) $qty=0;
-            if (empty($info_bits)) $info_bits=0;
-            if (empty($txtva)) $txtva=0;
-            if (empty($txlocaltax1)) $txlocaltax1=0;
-            if (empty($txlocaltax2)) $txlocaltax2=0;
-            if (empty($remise)) $remise=0;
-            if (empty($remise_percent)) $remise_percent=0;
-            $remise_percent=price2num($remise_percent);
-            $qty=price2num($qty);
-            $pu = price2num($pu);
-            $txtva=price2num($txtva);
-            $txlocaltax1=price2num($txlocaltax1);
-            $txlocaltax2=price2num($txlocaltax2);
-
-            // Calcul du total TTC et de la TVA pour la ligne a partir de
-            // qty, pu, remise_percent et txtva
-            // TRES IMPORTANT: C'est au moment de l'insertion ligne qu'on doit stocker
-            // la part ht, tva et ttc, et ce au niveau de la ligne qui a son propre taux tva.
-            $tabprice=calcul_price_total($qty, $pu, $remise_percent, $txtva, $txlocaltax1, $txlocaltax2, 0, $price_base_type, $info_bits);
-            $total_ht  = $tabprice[0];
-            $total_tva = $tabprice[1];
-            $total_ttc = $tabprice[2];
-            $total_localtax1 = $tabprice[9];
-            $total_localtax2 = $tabprice[10];
-
-            // Anciens indicateurs: $price, $subprice, $remise (a ne plus utiliser)
-            $price = $pu;
-            $subprice = $pu;
-            $remise = 0;
-            if ($remise_percent > 0)
-            {
-                $remise = round(($pu * $remise_percent / 100),2);
-                $price = ($pu - $remise);
-            }
-
-            // Update line
-            $this->line=new RepairLine($this->db);
-
-            // Stock previous line records
-            $staticline=new RepairLine($this->db);
-            $staticline->fetch($rowid);
-            $this->line->oldline = $staticline;
-
-            // Reorder if fk_parent_line change
-            if (! empty($fk_parent_line) && ! empty($staticline->fk_parent_line) && $fk_parent_line != $staticline->fk_parent_line)
-            {
-            	$rangmax = $this->line_max($fk_parent_line);
-            	$this->line->rang = $rangmax + 1;
-            }
-
-            $this->line->rowid=$rowid;
-            $this->line->desc=$desc;
-            $this->line->qty=$qty;
-            $this->line->tva_tx=$txtva;
-            $this->line->localtax1_tx=$txlocaltax1;
-            $this->line->localtax2_tx=$txlocaltax2;
-            $this->line->remise_percent=$remise_percent;
-            $this->line->subprice=$subprice;
-            $this->line->info_bits=$info_bits;
-            $this->line->special_code=0;	// To remove special_code=3 coming from proposals copy
-            $this->line->total_ht=$total_ht;
-            $this->line->total_tva=$total_tva;
-            $this->line->total_localtax1=$total_localtax1;
-            $this->line->total_localtax2=$total_localtax2;
-            $this->line->total_ttc=$total_ttc;
-            $this->line->date_start=$date_start;
-            $this->line->date_end=$date_end;
-            $this->line->product_type=$type;
-            $this->line->fk_parent_line=$fk_parent_line;
-            $this->line->skip_update_total=$skip_update_total;
-
-            // TODO deprecated
-            $this->line->price=$price;
-            $this->line->remise=$remise;
-
-            $result=$this->line->update();
-            if ($result > 0)
-            {
-            	// Reorder if child line
-            	if (! empty($fk_parent_line)) $this->line_order(true,'DESC');
-
-                // Mise a jour info denormalisees
-                $this->update_price(1);
-
-                $this->db->commit();
-                return $result;
-            }
-            else
-            {
-                $this->error=$this->db->error();
-                $this->db->rollback();
-                dol_syslog("CustomerRepair::UpdateLine Error=".$this->error, LOG_ERR);
-                return -1;
-            }
-        }
-        else
-        {
-            $this->error="CustomerRepair::Updateline Repair status makes operation forbidden";
-            return -2;
-        }
-    }
 
     /**
      *	Load indicators for dashboard (this->nbtodo and this->nbtodolate)
