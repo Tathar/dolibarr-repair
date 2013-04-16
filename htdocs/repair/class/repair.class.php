@@ -617,6 +617,229 @@ class Repair extends CommonOrder
         }
     }
 
+    /**
+     *	Create repair
+     *	Note that this->ref can be set or empty. If empty, we will use "(PROV)"
+     *
+     *	@param		User	$user 		Objet user that make creation
+     *	@param		int		$notrigger	Disable all triggers
+     *	@return 	int					<0 if KO, >0 if OK
+     */
+    function create($user, $notrigger=0)
+    {
+        global $conf,$langs,$mysoc;
+        $error=0;
+
+        // Clean parameters
+        $this->brouillon = 1;		// On positionne en mode brouillon la reparation
+
+        dol_syslog(get_class($this)."::create user=".$user->id);
+
+        // Check parameters
+        $soc = new Societe($this->db);
+        $result=$soc->fetch($this->socid);
+        if ($result < 0)
+        {
+            $this->error="Failed to fetch company";
+            dol_syslog(get_class($this)."::create ".$this->error, LOG_ERR);
+            return -2;
+        }
+        if (! empty($conf->global->REPAIR_REQUIRE_SOURCE) && $this->source < 0)
+        {
+            $this->error=$langs->trans("ErrorFieldRequired",$langs->trans("Source"));
+            dol_syslog(get_class($this)."::create ".$this->error, LOG_ERR);
+            return -1;
+        }
+//<Tathar>
+		$machine_obj = new Machine($this->db);
+		$machine_obj->trademark = $this->trademark;
+		$machine_obj->model = $this->model;
+		$machine_obj->type_id = $this->type_id;
+		$machine_obj->n_model = $this->n_model;
+		$machine_obj->serial_num = $this->serial_num;
+		$result = $machine_obj->create($user, $notrigger);
+		dol_syslog(get_class($this)."::create Machine", LOG_DEBUG);
+		if ($result < 0)
+		{
+            dol_syslog(get_class($this)."::create machine_obj->create return ".$result, LOG_ERR);
+            $this->db->rollback();
+            return -1;
+		}
+		$fk_machine = $result;
+//</Tathar>
+        // $date_repair is deprecated
+        $date = ($this->date_repair ? $this->date_repair : $this->date);
+
+        $now=dol_now();
+
+        $this->db->begin();
+
+        $sql = "INSERT INTO ".MAIN_DB_PREFIX."repair (";
+        $sql.= " ref, fk_soc, date_creation, fk_user_author, fk_projet, fk_machine, breakdown, support_id, accessory, date_repair, source, note, note_public, ref_client, ref_int";
+        $sql.= ", model_pdf, fk_cond_reglement, fk_mode_reglement, fk_availability, fk_input_reason, date_livraison, fk_adresse_livraison";
+        $sql.= ", remise_absolue, remise_percent";
+        $sql.= ", entity";
+        $sql.= ")";
+        $sql.= " VALUES ('(PROV)',".$this->socid.", ".$this->db->idate($now).", ".$user->id;
+        $sql.= ", ".($this->fk_project?$this->fk_project:"null");
+        $sql.= ", ".$fk_machine;
+		$sql.= ", '".$this->breakdown."'";
+		$sql.= ", '".$this->support_id."'";
+		$sql.= ", '".$this->accessory."'";
+        $sql.= ", ".$this->db->idate($date);
+        $sql.= ", ".($this->source>=0 && $this->source != '' ?$this->source:'null');
+        $sql.= ", '".$this->db->escape($this->note)."'";
+        $sql.= ", '".$this->db->escape($this->note_public)."'";
+        $sql.= ", '".$this->db->escape($this->ref_client)."'";
+        $sql.= ", ".($this->ref_int?"'".$this->db->escape($this->ref_int)."'":"null");
+        $sql.= ", '".$this->modelpdf."'";
+        $sql.= ", ".($this->cond_reglement_id>0?"'".$this->cond_reglement_id."'":"null");
+        $sql.= ", ".($this->mode_reglement_id>0?"'".$this->mode_reglement_id."'":"null");
+        $sql.= ", ".($this->availability_id>0?"'".$this->availability_id."'":"null");
+        $sql.= ", ".($this->demand_reason_id>0?"'".$this->demand_reason_id."'":"null");
+        $sql.= ", ".($this->date_livraison?"'".$this->db->idate($this->date_livraison)."'":"null");
+        $sql.= ", ".($this->fk_delivery_address>0?$this->fk_delivery_address:'NULL');
+        $sql.= ", ".($this->remise_absolue>0?$this->remise_absolue:'NULL');
+        $sql.= ", '".$this->remise_percent."'";
+        $sql.= ", ".$conf->entity;
+        $sql.= ")";
+
+        dol_syslog("Repair::create sql=".$sql);
+        $resql=$this->db->query($sql);
+        if ($resql)
+        {
+            $this->id = $this->db->last_insert_id(MAIN_DB_PREFIX.'repair');
+
+            if ($this->id)
+            {
+                $fk_parent_line=0;
+                $num=count($this->lines);
+
+                /*
+                 *  Insertion du detail des produits dans la base
+                 */
+                for ($i=0;$i<$num;$i++)
+                {
+                    // Reset fk_parent_line for no child products and special product
+                    if (($this->lines[$i]->product_type != 9 && empty($this->lines[$i]->fk_parent_line)) || $this->lines[$i]->product_type == 9) {
+                        $fk_parent_line = 0;
+                    }
+
+                    $result = $this->addline(
+                        $this->id,
+                        $this->lines[$i]->desc,
+                        $this->lines[$i]->subprice,
+                        $this->lines[$i]->qty,
+                        $this->lines[$i]->tva_tx,
+                        $this->lines[$i]->localtax1_tx,
+                        $this->lines[$i]->localtax2_tx,
+                        $this->lines[$i]->fk_product,
+                        $this->lines[$i]->remise_percent,
+                        $this->lines[$i]->info_bits,
+                        $this->lines[$i]->fk_remise_except,
+                        'HT',
+                        0,
+                        $this->lines[$i]->date_start,
+                        $this->lines[$i]->date_end,
+                        $this->lines[$i]->product_type,
+                        $this->lines[$i]->rang,
+                        $this->lines[$i]->special_code,
+                        $fk_parent_line,
+                        $this->lines[$i]->fk_fournprice,
+                        $this->lines[$i]->pa_ht,
+                    	$this->lines[$i]->label
+                    );
+                    if ($result < 0)
+                    {
+                        $this->error=$this->db->lasterror();
+                        dol_print_error($this->db);
+                        $this->db->rollback();
+                        return -1;
+                    }
+                    // Defined the new fk_parent_line
+                    if ($result > 0 && $this->lines[$i]->product_type == 9) {
+                        $fk_parent_line = $result;
+                    }
+                }
+
+                // Mise a jour ref
+//<Tathar>
+				$this->date = $date;
+//</Tathar>
+				$sql = 'UPDATE '.MAIN_DB_PREFIX."repair SET ref='(PROV".$this->id.")' WHERE rowid=".$this->id;
+                if ($this->db->query($sql))
+                {
+                    if ($this->id)
+                    {
+                        $this->ref="(PROV".$this->id.")";
+
+                        // Add object linked
+                        if (is_array($this->linked_objects) && ! empty($this->linked_objects))
+                        {
+                        	foreach($this->linked_objects as $origin => $origin_id)
+                        	{
+                        		$ret = $this->add_object_linked($origin, $origin_id);
+                        		if (! $ret)
+                        		{
+                        			dol_print_error($this->db);
+                        			$error++;
+                        		}
+
+                        		// TODO mutualiser
+                        		if ($origin == 'propal' && $origin_id)
+                        		{
+                        			// On recupere les differents contact interne et externe
+                        			$prop = new Propal($this->db, $this->socid, $origin_id);
+
+                        			// On recupere le commercial suivi propale
+                        			$this->userid = $prop->getIdcontact('internal', 'SALESREPFOLL');
+
+                        			if ($this->userid)
+                        			{
+                        				//On passe le commercial suivi propale en commercial suivi repair
+                        				$this->add_contact($this->userid[0], 'SALESREPFOLL', 'internal');
+                        			}
+
+                        			// On recupere le contact client suivi propale
+                        			$this->contactid = $prop->getIdcontact('external', 'CUSTOMER');
+
+                        			if ($this->contactid)
+                        			{
+                        				//On passe le contact client suivi propale en contact client suivi repair
+                        				$this->add_contact($this->contactid[0], 'CUSTOMER', 'external');
+                        			}
+                        		}
+                        	}
+                        }
+                    }
+
+                    if (! $notrigger)
+                    {
+                        // Appel des triggers
+                        include_once DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php";
+                        $interface=new Interfaces($this->db);
+                        $result=$interface->run_triggers('REPAIR_CREATE',$this,$user,$langs,$conf);
+                        if ($result < 0) { $error++; $this->errors=$interface->errors; }
+                        // Fin appel triggers
+                    }
+
+                    $this->db->commit();
+                    return $this->id;
+                }
+                else
+                {
+                    $this->db->rollback();
+                    return -1;
+                }
+            }
+        }
+        else
+        {
+            dol_print_error($this->db);
+            $this->db->rollback();
+            return -1;
+        }
+    }
 
 
 
@@ -1153,229 +1376,6 @@ class Repair extends CommonOrder
         }
     }
 */
-
-
-    /**
-     *	Create repair
-     *	Note that this->ref can be set or empty. If empty, we will use "(PROV)"
-     *
-     *	@param		User	$user 		Objet user that make creation
-     *	@param		int		$notrigger	Disable all triggers
-     *	@return 	int					<0 if KO, >0 if OK
-     */
-    function create($user, $notrigger=0)
-    {
-        global $conf,$langs,$mysoc;
-        $error=0;
-
-        // Clean parameters
-        $this->brouillon = 1;		// On positionne en mode brouillon la reparation
-
-        dol_syslog("Repair::create user=".$user->id);
-
-        // Check parameters
-        $soc = new Societe($this->db);
-        $result=$soc->fetch($this->socid);
-        if ($result < 0)
-        {
-            $this->error="Failed to fetch company";
-            dol_syslog("Repair::create ".$this->error, LOG_ERR);
-            return -2;
-        }
-        if (! empty($conf->global->REPAIR_REQUIRE_SOURCE) && $this->source < 0)
-        {
-            $this->error=$langs->trans("ErrorFieldRequired",$langs->trans("Source"));
-            dol_syslog(get_class($this)."::create ".$this->error, LOG_ERR);
-            return -1;
-        }
-//<Tathar>
-		$machine_obj = new Machine($this->db);
-		$machine_obj->trademark = $this->trademark;
-		$machine_obj->model = $this->model;
-		$machine_obj->type_id = $this->type_id;
-		$machine_obj->n_model = $this->n_model;
-		$machine_obj->serial_num = $this->serial_num;
-		$result = $machine_obj->create($user, $notrigger);
-		dol_syslog(get_class($this)."::create Machine", LOG_DEBUG);
-		if ($result < 0)
-		{
-            dol_syslog(get_class($this)."::create machine_obj->create return ".$result, LOG_ERR);
-            $this->db->rollback();
-            return -1;
-		}
-		$fk_machine = $result;
-//</Tathar>
-        // $date_repair is deprecated
-        $date = ($this->date_repair ? $this->date_repair : $this->date);
-        $now=dol_now();
-
-        $this->db->begin();
-
-        $sql = "INSERT INTO ".MAIN_DB_PREFIX."repair (";
-        $sql.= " ref, fk_soc, date_creation, fk_user_author, fk_projet, fk_machine, breakdown, support_id, accessory, date_repair, source, note, note_public, ref_client, ref_int";
-        $sql.= ", model_pdf, fk_cond_reglement, fk_mode_reglement, fk_availability, fk_input_reason, date_livraison, fk_adresse_livraison";
-        $sql.= ", remise_absolue, remise_percent";
-        $sql.= ", entity";
-        $sql.= ")";
-        $sql.= " VALUES ('(PROV)',".$this->socid.", ".$this->db->idate($now).", ".$user->id;
-        $sql.= ", ".($this->fk_project?$this->fk_project:"null");
-        $sql.= ", ".$fk_machine;
-		$sql.= ", '".$this->breakdown."'";
-		$sql.= ", '".$this->support_id."'";
-		$sql.= ", '".$this->accessory."'";
-        $sql.= ", ".$this->db->idate($date);
-        $sql.= ", ".($this->source>=0 && $this->source != '' ?$this->source:'null');
-        $sql.= ", '".$this->db->escape($this->note)."'";
-        $sql.= ", '".$this->db->escape($this->note_public)."'";
-        $sql.= ", '".$this->db->escape($this->ref_client)."'";
-        $sql.= ", ".($this->ref_int?"'".$this->db->escape($this->ref_int)."'":"null");
-        $sql.= ", '".$this->modelpdf."'";
-        $sql.= ", ".($this->cond_reglement_id>0?"'".$this->cond_reglement_id."'":"null");
-        $sql.= ", ".($this->mode_reglement_id>0?"'".$this->mode_reglement_id."'":"null");
-        $sql.= ", ".($this->availability_id>0?"'".$this->availability_id."'":"null");
-        $sql.= ", ".($this->demand_reason_id>0?"'".$this->demand_reason_id."'":"null");
-        $sql.= ", ".($this->date_livraison?"'".$this->db->idate($this->date_livraison)."'":"null");
-        $sql.= ", ".($this->fk_delivery_address>0?$this->fk_delivery_address:'NULL');
-        $sql.= ", ".($this->remise_absolue>0?$this->remise_absolue:'NULL');
-        $sql.= ", '".$this->remise_percent."'";
-        $sql.= ", ".$conf->entity;
-        $sql.= ")";
-
-        dol_syslog("Repair::create sql=".$sql);
-        $resql=$this->db->query($sql);
-        if ($resql)
-        {
-            $this->id = $this->db->last_insert_id(MAIN_DB_PREFIX.'repair');
-
-            if ($this->id)
-            {
-                $fk_parent_line=0;
-                $num=count($this->lines);
-
-                /*
-                 *  Insertion du detail des produits dans la base
-                 */
-                for ($i=0;$i<$num;$i++)
-                {
-                    // Reset fk_parent_line for no child products and special product
-                    if (($this->lines[$i]->product_type != 9 && empty($this->lines[$i]->fk_parent_line)) || $this->lines[$i]->product_type == 9) {
-                        $fk_parent_line = 0;
-                    }
-
-                    $result = $this->addline(
-                        $this->id,
-                        $this->lines[$i]->desc,
-                        $this->lines[$i]->subprice,
-                        $this->lines[$i]->qty,
-                        $this->lines[$i]->tva_tx,
-                        $this->lines[$i]->localtax1_tx,
-                        $this->lines[$i]->localtax2_tx,
-                        $this->lines[$i]->fk_product,
-                        $this->lines[$i]->remise_percent,
-                        $this->lines[$i]->info_bits,
-                        $this->lines[$i]->fk_remise_except,
-                        'HT',
-                        0,
-                        $this->lines[$i]->date_start,
-                        $this->lines[$i]->date_end,
-                        $this->lines[$i]->product_type,
-                        $this->lines[$i]->rang,
-                        $this->lines[$i]->special_code,
-                        $fk_parent_line
-                    );
-                    if ($result < 0)
-                    {
-                        $this->error=$this->db->lasterror();
-                        dol_print_error($this->db);
-                        $this->db->rollback();
-                        return -1;
-                    }
-                    // Defined the new fk_parent_line
-                    if ($result > 0 && $this->lines[$i]->product_type == 9) {
-                        $fk_parent_line = $result;
-                    }
-                }
-                // Mise a jour ref
-//<Tathar>
-				$this->date = $date;
-//</Tathar>
-//				$ref = $this->getNextNumRef($soc);
-//                $sql = 'UPDATE '.MAIN_DB_PREFIX."repair SET ref='".$ref."' WHERE rowid=".$this->id;
-				$sql = 'UPDATE '.MAIN_DB_PREFIX."repair SET ref='(PROV".$this->id.")' WHERE rowid=".$this->id;
-				dol_syslog(get_class($this)."::create update NumRef sql=".$sql);
-                if ($this->db->query($sql))
-                {
-                    if ($this->id)
-                    {
-                        $this->ref=$ref;
-
-                        // Add object linked
-                        if (is_array($this->linked_objects) && ! empty($this->linked_objects))
-                        {
-                        	foreach($this->linked_objects as $origin => $origin_id)
-                        	{
-                        		$ret = $this->add_object_linked($origin, $origin_id);
-                        		if (! $ret)
-                        		{
-                        			dol_print_error($this->db);
-                        			$error++;
-                        		}
-
-                        		// TODO mutualiser
-                        		if ($origin == 'propal' && $origin_id)
-                        		{
-                        			// On recupere les differents contact interne et externe
-                        			$prop = new Propal($this->db, $this->socid, $origin_id);
-
-                        			// On recupere le commercial suivi propale
-                        			$this->userid = $prop->getIdcontact('internal', 'SALESREPFOLL');
-
-                        			if ($this->userid)
-                        			{
-                        				//On passe le commercial suivi propale en commercial suivi repair
-                        				$this->add_contact($this->userid[0], 'SALESREPFOLL', 'internal');
-                        			}
-
-                        			// On recupere le contact client suivi propale
-                        			$this->contactid = $prop->getIdcontact('external', 'CUSTOMER');
-
-                        			if ($this->contactid)
-                        			{
-                        				//On passe le contact client suivi propale en contact client suivi repair
-                        				$this->add_contact($this->contactid[0], 'CUSTOMER', 'external');
-                        			}
-                        		}
-                        	}
-                        }
-                    }
-
-                    if (! $notrigger)
-                    {
-                        // Appel des triggers
-                        include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
-                        $interface=new Interfaces($this->db);
-                        $result=$interface->run_triggers('ORDER_CREATE',$this,$user,$langs,$conf);
-                        if ($result < 0) { $error++; $this->errors=$interface->errors; }
-                        // Fin appel triggers
-                    }
-
-                    $this->db->commit();
-                    return $this->id;
-                }
-                else
-                {
-                    $this->db->rollback();
-                    return -1;
-                }
-            }
-        }
-        else
-        {
-            dol_print_error($this->db);
-            $this->db->rollback();
-            return -1;
-        }
-    }
 
 
     /**
