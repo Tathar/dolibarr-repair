@@ -1423,6 +1423,204 @@ class Repair extends CommonOrder
     }
 
 
+    /**
+     *	Adding line of fixed discount in the order in DB
+     *
+     *	@param     int	$idremise			Id de la remise fixe
+     *	@return    int          			>0 si ok, <0 si ko
+     */
+    function insert_discount($idremise)
+    {
+        global $langs;
+
+        include_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
+        include_once DOL_DOCUMENT_ROOT.'/core/class/discount.class.php';
+
+        $this->db->begin();
+
+        $remise=new DiscountAbsolute($this->db);
+        $result=$remise->fetch($idremise);
+
+        if ($result > 0)
+        {
+            if ($remise->fk_facture)	// Protection against multiple submission
+            {
+                $this->error=$langs->trans("ErrorDiscountAlreadyUsed");
+                $this->db->rollback();
+                return -5;
+            }
+
+            $line = new RepairLine($this->db);
+
+            $line->fk_repair=$this->id;
+            $line->fk_remise_except=$remise->id;
+            $line->desc=$remise->description;   	// Description ligne
+            $line->tva_tx=$remise->tva_tx;
+            $line->subprice=-$remise->amount_ht;
+            $line->price=-$remise->amount_ht;
+            $line->fk_product=0;					// Id produit predefini
+            $line->qty=1;
+            $line->remise=0;
+            $line->remise_percent=0;
+            $line->rang=-1;
+            $line->info_bits=2;
+
+            $line->total_ht  = -$remise->amount_ht;
+            $line->total_tva = -$remise->amount_tva;
+            $line->total_ttc = -$remise->amount_ttc;
+
+            $result=$line->insert();
+            if ($result > 0)
+            {
+                $result=$this->update_price(1);
+                if ($result > 0)
+                {
+                    $this->db->commit();
+                    return 1;
+                }
+                else
+                {
+                    $this->db->rollback();
+                    return -1;
+                }
+            }
+            else
+            {
+                $this->error=$line->error;
+                $this->db->rollback();
+                return -2;
+            }
+        }
+        else
+        {
+            $this->db->rollback();
+            return -2;
+        }
+    }
+
+
+    /**
+     *	Load array lines
+     *
+     *	@param		int		$only_product	Return only physical products
+     *	@return		int						<0 if KO, >0 if OK
+     */
+    function fetch_lines($only_product=0)
+    {
+        $this->lines=array();
+
+        $sql = 'SELECT l.rowid, l.fk_product, l.fk_parent_line, l.product_type, l.fk_repair, l.label as custom_label, l.description, l.price, l.qty, l.tva_tx,';
+        $sql.= ' l.localtax1_tx, l.localtax2_tx, l.fk_remise_except, l.remise_percent, l.subprice, l.fk_product_fournisseur_price as fk_fournprice, l.buy_price_ht as pa_ht, l.rang, l.info_bits, l.special_code,';
+        $sql.= ' l.total_ht, l.total_ttc, l.total_tva, l.total_localtax1, l.total_localtax2, l.date_start, l.date_end,';
+        $sql.= ' p.ref as product_ref, p.description as product_desc, p.fk_product_type, p.label as product_label';
+        $sql.= ' FROM '.MAIN_DB_PREFIX.'repairdet as l';
+        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'product as p ON (p.rowid = l.fk_product)';
+        $sql.= ' WHERE l.fk_repair = '.$this->id;
+        if ($only_product) $sql .= ' AND p.fk_product_type = 0';
+        $sql .= ' ORDER BY l.rang';
+
+        dol_syslog("Repair::fetch_lines sql=".$sql,LOG_DEBUG);
+        $result = $this->db->query($sql);
+        if ($result)
+        {
+            $num = $this->db->num_rows($result);
+
+            $i = 0;
+            while ($i < $num)
+            {
+                $objp = $this->db->fetch_object($result);
+
+                $line = new RepairLine($this->db);
+
+                $line->rowid            = $objp->rowid;				// \deprecated
+                $line->id               = $objp->rowid;
+                $line->fk_repair        = $objp->fk_repair;
+                $line->repair_id        = $objp->fk_repair;			// \deprecated
+                $line->label            = $objp->custom_label;
+                $line->desc             = $objp->description;  		// Description ligne
+                $line->product_type     = $objp->product_type;
+                $line->qty              = $objp->qty;
+                $line->tva_tx           = $objp->tva_tx;
+                $line->localtax1_tx     = $objp->localtax1_tx;
+                $line->localtax2_tx     = $objp->localtax2_tx;
+                $line->total_ht         = $objp->total_ht;
+                $line->total_ttc        = $objp->total_ttc;
+                $line->total_tva        = $objp->total_tva;
+                $line->total_localtax1  = $objp->total_localtax1;
+                $line->total_localtax2  = $objp->total_localtax2;
+                $line->subprice         = $objp->subprice;
+                $line->fk_remise_except = $objp->fk_remise_except;
+                $line->remise_percent   = $objp->remise_percent;
+                $line->price            = $objp->price;
+                $line->fk_product       = $objp->fk_product;
+				$line->fk_fournprice 	= $objp->fk_fournprice;
+		      	$marginInfos			= getMarginInfos($objp->subprice, $objp->remise_percent, $objp->tva_tx, $objp->localtax1_tx, $objp->localtax2_tx, $line->fk_fournprice, $objp->pa_ht);
+		   		$line->pa_ht 			= $marginInfos[0];
+		    	$line->marge_tx			= $marginInfos[1];
+		     	$line->marque_tx		= $marginInfos[2];
+                $line->rang             = $objp->rang;
+                $line->info_bits        = $objp->info_bits;
+                $line->special_code		= $objp->special_code;
+                $line->fk_parent_line	= $objp->fk_parent_line;
+
+                $line->ref				= $objp->product_ref;		// TODO deprecated
+                $line->product_ref		= $objp->product_ref;
+                $line->libelle			= $objp->product_label;		// TODO deprecated
+                $line->product_label	= $objp->product_label;
+                $line->product_desc     = $objp->product_desc; 		// Description produit
+                $line->fk_product_type  = $objp->fk_product_type;	// Produit ou service
+
+                $line->date_start       = $this->db->jdate($objp->date_start);
+                $line->date_end         = $this->db->jdate($objp->date_end);
+
+                $this->lines[$i] = $line;
+
+                $i++;
+            }
+            $this->db->free($result);
+
+            return 1;
+        }
+        else
+        {
+            $this->error=$this->db->error();
+            dol_syslog('Repair::fetch_lines: Error '.$this->error, LOG_ERR);
+            return -3;
+        }
+    }
+
+
+    /**
+     *	Return number of line with type product.
+     *
+     *	@return		int		<0 if KO, Nbr of product lines if OK
+     */
+    function getNbOfProductsLines()
+    {
+        $nb=0;
+        foreach($this->lines as $line)
+        {
+            if ($line->product_type == 0) $nb++;
+        }
+        return $nb;
+    }
+
+    /**
+     *	Return number of line with type service.
+     *
+     *	@return		int		<0 if KO, Nbr of service lines if OK
+     */
+    function getNbOfServicesLines()
+    {
+        $nb=0;
+        foreach($this->lines as $line)
+        {
+            if ($line->product_type == 1) $nb++;
+        }
+        return $nb;
+    }
+
+
 
 
 
@@ -2163,187 +2361,7 @@ class Repair extends CommonOrder
 
 
 
-    /**
-     *	Adding line of fixed discount in the order in DB
-     *
-     *	@param     int	$idremise			Id de la remise fixe
-     *	@return    int          			>0 si ok, <0 si ko
-     */
-    function insert_discount($idremise)
-    {
-        global $langs;
 
-        include_once(DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php');
-        include_once(DOL_DOCUMENT_ROOT.'/core/class/discount.class.php');
-
-        $this->db->begin();
-
-        $remise=new DiscountAbsolute($this->db);
-        $result=$remise->fetch($idremise);
-
-        if ($result > 0)
-        {
-            if ($remise->fk_facture)	// Protection against multiple submission
-            {
-                $this->error=$langs->trans("ErrorDiscountAlreadyUsed");
-                $this->db->rollback();
-                return -5;
-            }
-
-            $line = new RepairLine($this->db);
-
-            $line->fk_repair=$this->id;
-            $line->fk_remise_except=$remise->id;
-            $line->desc=$remise->description;   	// Description ligne
-            $line->tva_tx=$remise->tva_tx;
-            $line->subprice=-$remise->amount_ht;
-            $line->price=-$remise->amount_ht;
-            $line->fk_product=0;					// Id produit predefini
-            $line->qty=1;
-            $line->remise=0;
-            $line->remise_percent=0;
-            $line->rang=-1;
-            $line->info_bits=2;
-
-            $line->total_ht  = -$remise->amount_ht;
-            $line->total_tva = -$remise->amount_tva;
-            $line->total_ttc = -$remise->amount_ttc;
-
-            $result=$line->insert();
-            if ($result > 0)
-            {
-                $result=$this->update_price(1);
-                if ($result > 0)
-                {
-                    $this->db->commit();
-                    return 1;
-                }
-                else
-                {
-                    $this->db->rollback();
-                    return -1;
-                }
-            }
-            else
-            {
-                $this->error=$line->error;
-                $this->db->rollback();
-                return -2;
-            }
-        }
-        else
-        {
-            $this->db->rollback();
-            return -2;
-        }
-    }
-
-
-    /**
-     *	Load array lines
-     *
-     *	@param		int		$only_product	Return only physical products
-     *	@return		int						<0 if KO, >0 if OK
-     */
-    function fetch_lines($only_product=0)
-    {
-        $this->lines=array();
-
-        $sql = 'SELECT l.rowid, l.fk_product, l.fk_parent_line, l.product_type, l.fk_repair, l.label as custom_label, l.description, l.price, l.qty, l.tva_tx,';
-        $sql.= ' l.localtax1_tx, l.localtax2_tx, l.fk_remise_except, l.remise_percent, l.subprice, l.fk_product_fournisseur_price as fk_fournprice, l.buy_price_ht as pa_ht, l.rang, l.info_bits, l.special_code,';
-        $sql.= ' l.total_ht, l.total_ttc, l.total_tva, l.total_localtax1, l.total_localtax2, l.date_start, l.date_end,';
-        $sql.= ' p.ref as product_ref, p.description as product_desc, p.fk_product_type, p.label as product_label';
-        $sql.= ' FROM '.MAIN_DB_PREFIX.'repairdet as l';
-        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'product as p ON (p.rowid = l.fk_product)';
-        $sql.= ' WHERE l.fk_repair = '.$this->id;
-        if ($only_product) $sql .= ' AND p.fk_product_type = 0';
-        $sql .= ' ORDER BY l.rang';
-
-        dol_syslog("Repair::fetch_lines sql=".$sql,LOG_DEBUG);
-        $result = $this->db->query($sql);
-        if ($result)
-        {
-            $num = $this->db->num_rows($result);
-
-            $i = 0;
-            while ($i < $num)
-            {
-                $objp = $this->db->fetch_object($result);
-
-                $line = new RepairLine($this->db);
-
-                $line->rowid            = $objp->rowid;				// \deprecated
-                $line->id               = $objp->rowid;
-                $line->fk_repair        = $objp->fk_repair;
-                $line->repair_id        = $objp->fk_repair;			// \deprecated
-                $line->label            = $objp->custom_label;
-                $line->desc             = $objp->description;  		// Description ligne
-                $line->product_type     = $objp->product_type;
-                $line->qty              = $objp->qty;
-                $line->tva_tx           = $objp->tva_tx;
-                $line->localtax1_tx     = $objp->localtax1_tx;
-                $line->localtax2_tx     = $objp->localtax2_tx;
-                $line->total_ht         = $objp->total_ht;
-                $line->total_ttc        = $objp->total_ttc;
-                $line->total_tva        = $objp->total_tva;
-                $line->total_localtax1  = $objp->total_localtax1;
-                $line->total_localtax2  = $objp->total_localtax2;
-                $line->subprice         = $objp->subprice;
-                $line->fk_remise_except = $objp->fk_remise_except;
-                $line->remise_percent   = $objp->remise_percent;
-                $line->price            = $objp->price;
-                $line->fk_product       = $objp->fk_product;
-				$line->fk_fournprice 	= $objp->fk_fournprice;
-		      	$marginInfos			= getMarginInfos($objp->subprice, $objp->remise_percent, $objp->tva_tx, $objp->localtax1_tx, $objp->localtax2_tx, $line->fk_fournprice, $objp->pa_ht);
-		   		$line->pa_ht 			= $marginInfos[0];
-		    	$line->marge_tx			= $marginInfos[1];
-		     	$line->marque_tx		= $marginInfos[2];
-                $line->rang             = $objp->rang;
-                $line->info_bits        = $objp->info_bits;
-                $line->special_code		= $objp->special_code;
-                $line->fk_parent_line	= $objp->fk_parent_line;
-
-                $line->ref				= $objp->product_ref;		// TODO deprecated
-                $line->product_ref		= $objp->product_ref;
-                $line->libelle			= $objp->product_label;		// TODO deprecated
-                $line->product_label	= $objp->product_label;
-                $line->product_desc     = $objp->product_desc; 		// Description produit
-                $line->fk_product_type  = $objp->fk_product_type;	// Produit ou service
-
-                $line->date_start       = $this->db->jdate($objp->date_start);
-                $line->date_end         = $this->db->jdate($objp->date_end);
-
-                $this->lines[$i] = $line;
-
-                $i++;
-            }
-            $this->db->free($result);
-
-            return 1;
-        }
-        else
-        {
-            $this->error=$this->db->error();
-            dol_syslog('Repair::fetch_lines: Error '.$this->error, LOG_ERR);
-            return -3;
-        }
-    }
-
-
-    /**
-     *	Return number of line with type product.
-     *
-     *	@return		int		<0 if KO, Nbr of product lines if OK
-     */
-    function getNbOfProductsLines()
-    {
-        $nb=0;
-        foreach($this->lines as $line)
-        {
-            if ($line->fk_product_type == 0) $nb++;
-        }
-        return $nb;
-    }
 
     /**
      *	Load array this->expeditions of nb of products sent by line in order
