@@ -35,17 +35,17 @@
 function repair_prepare_head($object)
 {
 	global $langs, $conf, $user;
-	if ($conf->expedition->enabled) $langs->load("sendings");
+	if (! empty($conf->expedition->enabled)) $langs->load("sendings");
 	$langs->load("orders");
 
 	$h = 0;
 	$head = array();
 
-	if ($conf->repair->enabled && $user->rights->repair->lire)
+	if (! empty($conf->repair->enabled) && $user->rights->repair->lire)
 	{
 		$head[$h][0] = DOL_URL_ROOT.'/repair/fiche.php?id='.$object->id;
 		$head[$h][1] = $langs->trans("RepairCard");
-		$head[$h][2] = 'order';
+		$head[$h][2] = 'repair';
 		$h++;
 	}
 /*
@@ -80,12 +80,12 @@ function repair_prepare_head($object)
     // Show more tabs from modules
     // Entries must be declared in modules descriptor with line
     // $this->tabs = array('entity:+tabname:Title:@mymodule:/mymodule/mypage.php?id=__ID__');   to add new tab
-    // $this->tabs = array('entity:-tabname:Title:@mymodule:/mymodule/mypage.php?id=__ID__');   to remove a tab
+    // $this->tabs = array('entity:-tabname);   												to remove a tab
     complete_head_from_modules($conf,$langs,$object,$head,$h,'repair');
 
     $head[$h][0] = DOL_URL_ROOT.'/repair/document.php?id='.$object->id;
 	/*$filesdir = $conf->repair->dir_output . "/" . dol_sanitizeFileName($repair->ref);
-	include_once(DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php');
+	include_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 	$listoffiles=dol_dir_list($filesdir,'files',1);
 	$head[$h][1] = (count($listoffiles)?$langs->trans('DocumentsNb',count($listoffiles)):$langs->trans('Documents'));*/
 	$head[$h][1] = $langs->trans('Documents');
@@ -104,6 +104,8 @@ function repair_prepare_head($object)
 	$head[$h][1] = $langs->trans("Info");
 	$head[$h][2] = 'info';
 	$h++;
+
+    complete_head_from_modules($conf,$langs,$object,$head,$h,'repair','remove');
 
 	return $head;
 }
