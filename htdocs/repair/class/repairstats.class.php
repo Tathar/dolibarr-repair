@@ -52,7 +52,7 @@ class RepairStats extends Stats
 	 * @param 	string	$mode	   Option
 	 * @param   int		$userid    Id user for filter
 	 */
-	function RepairStats($db, $socid, $mode, $userid=0)
+	function __construct($db, $socid, $mode, $userid=0)
 	{
 		global $user, $conf;
 
