@@ -32,7 +32,7 @@ create table llx_repair
   fk_soc				integer NOT NULL,
   fk_projet				integer DEFAULT NULL,			-- projet auquel est rattache la repair
 
-  fk_machine			integer NOT NULL,				-- Machine a a reparer
+  fk_machine			integer NOT NULL,				-- Machine a reparer
   breakdown				varchar(255),					-- Description de la panne
   accessory				varchar(255),					-- Accessoires recus avec la machine
   support_id			varchar(32),					-- Prise en charge (ex: magasin, client, confrere)
@@ -40,26 +40,19 @@ create table llx_repair
 
   tms					timestamp,
   date_creation			datetime,						-- date de creation
-  date_valid_e			datetime,						-- date de validation du devis
-  date_reply_e			datetime,						-- date de réponse au devis du client
-  date_valid_r			datetime,						-- date de validation de la reparation
+  date_valid			datetime,						-- date de validation
   date_cloture			datetime,						-- date de cloture
   date_repair			date,							-- date de la repair
 
-  date_calc				datetime,						-- date de calcule de temp de realisation devis et reparation
-  time_estimate			datetime,						-- temp passe a faire le devis
-  time_repair			datetime,						-- temp passe a faire la reparation
+  date_calc				datetime,						-- date de calcule de temp de realisation	TODO
+  time_used				datetime,						-- temp passe a faire la reparation			TODO
 
   fk_user_author		integer,						-- createur de la repair
-  fk_user_estimate		integer,						-- auteur du devis
-  fk_user_valid_e		integer,						-- valideur de la reparation
-  fk_user_reply_e		integer,						-- valideur de réponse au devis du client
-  fk_user_repair		integer,						-- auteur de la reparation
-  fk_user_valid_r		integer,						-- valideur de la reparation
+  fk_user_valid			integer,						-- valideur de la reparation
   fk_user_cloture		integer,						-- auteur cloture
   source				smallint,
   fk_statut				smallint  default 0,
-  repair_statut			smallint  default 0,
+  on_process			smallint  default 0,
   amount_ht				real      default 0,
   remise_percent		real      default 0,
   remise_absolue		real      default 0,
