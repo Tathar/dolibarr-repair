@@ -1621,6 +1621,212 @@ class Repair extends CommonOrder
     }
 
     /**
+     *	Load array this->expeditions of nb of products sent by line in order
+     *
+     *	@param      int		$filtre_statut      Filter on status
+     * 	@return     int                			<0 if KO, Nb of lines found if OK
+     *
+     *	TODO deprecated, move to Shipping class
+     */
+    function loadExpeditions($filtre_statut=-1)
+    {
+        $num=0;
+        $this->expeditions = array();
+
+        $sql = 'SELECT cd.rowid, cd.fk_product,';
+        $sql.= ' sum(ed.qty) as qty';
+        $sql.= ' FROM '.MAIN_DB_PREFIX.'expeditiondet as ed,';
+        if ($filtre_statut >= 0) $sql.= ' '.MAIN_DB_PREFIX.'expedition as e,';
+        $sql.= ' '.MAIN_DB_PREFIX.'repairdet as cd';
+        $sql.= ' WHERE';
+        if ($filtre_statut >= 0) $sql.= ' ed.fk_expedition = e.rowid AND';
+        $sql.= ' ed.fk_origin_line = cd.rowid';
+        $sql.= ' AND cd.fk_repair =' .$this->id;
+        if ($filtre_statut >= 0) $sql.=' AND e.fk_statut = '.$filtre_statut;
+        $sql.= ' GROUP BY cd.rowid, cd.fk_product';
+        //print $sql;
+
+        dol_syslog("Repair::loadExpeditions sql=".$sql,LOG_DEBUG);
+        $result = $this->db->query($sql);
+        if ($result)
+        {
+            $num = $this->db->num_rows($result);
+            $i = 0;
+            while ($i < $num)
+            {
+                $obj = $this->db->fetch_object($result);
+                $this->expeditions[$obj->rowid] = $obj->qty;
+                $i++;
+            }
+            $this->db->free();
+            return $num;
+        }
+        else
+        {
+            $this->error=$this->db->lasterror();
+            dol_syslog("Repair::loadExpeditions ".$this->error,LOG_ERR);
+            return -1;
+        }
+
+    }
+
+    /**
+     * Returns a array with expeditions lines number
+     *
+     * @return	int		Nb of shipments
+     *
+     * TODO deprecated, move to Shipping class
+     */
+    function nb_expedition()
+    {
+        $sql = 'SELECT count(*)';
+        $sql.= ' FROM '.MAIN_DB_PREFIX.'expedition as e';
+        $sql.= ', '.MAIN_DB_PREFIX.'element_element as el';
+        $sql.= ' WHERE el.fk_source = '.$this->id;
+        $sql.= " AND el.fk_target = e.rowid";
+        $sql.= " AND el.targettype = 'shipping'";
+
+        $resql = $this->db->query($sql);
+        if ($resql)
+        {
+            $row = $this->db->fetch_row($resql);
+            return $row[0];
+        }
+        else dol_print_error($this->db);
+    }
+
+    /**
+     *	Return a array with sendings by line
+     *
+     *	@param      int		$filtre_statut      Filtre sur statut
+     *	@return     int                 		0 si OK, <0 si KO
+     *
+     *	TODO  deprecated, move to Shipping class
+     */
+    function livraison_array($filtre_statut=-1)
+    {
+        $delivery = new Livraison($this->db);
+        $deliveryArray = $delivery->livraison_array($filtre_statut);
+        return $deliveryArray;
+    }
+
+    /**
+     *	Return a array with the pending stock by product
+     *
+     *	@param      int		$filtre_statut      Filtre sur statut
+     *	@return     int                 		0 si OK, <0 si KO
+     *
+     *	TODO		FONCTION NON FINIE A FINIR
+     */
+    function stock_array($filtre_statut=-1)
+    {
+        $this->stocks = array();
+
+        // Tableau des id de produit de la repair
+		$array_of_product=array();
+
+        // Recherche total en stock pour chaque produit
+        // TODO $array_of_product est défini vide juste au dessus !!
+        if (count($array_of_product))
+        {
+            $sql = "SELECT fk_product, sum(ps.reel) as total";
+            $sql.= " FROM ".MAIN_DB_PREFIX."product_stock as ps";
+            $sql.= " WHERE ps.fk_product IN (".join(',',$array_of_product).")";
+            $sql.= ' GROUP BY fk_product ';
+            $result = $this->db->query($sql);
+            if ($result)
+            {
+                $num = $this->db->num_rows($result);
+                $i = 0;
+                while ($i < $num)
+                {
+                    $obj = $this->db->fetch_object($result);
+                    $this->stocks[$obj->fk_product] = $obj->total;
+                    $i++;
+                }
+                $this->db->free();
+            }
+        }
+        return 0;
+    }
+
+    /**
+     *  Delete an order line
+     *
+     *  @param      int		$lineid		Id of line to delete
+     *  @return     int        		 	>0 if OK, 0 if nothing to do, <0 if KO
+     */
+    function deleteline($lineid)
+    {
+        global $user;
+
+        if ($this->statut == 0)
+        {
+            $this->db->begin();
+
+            $sql = "SELECT fk_product, qty";
+            $sql.= " FROM ".MAIN_DB_PREFIX."repairdet";
+            $sql.= " WHERE rowid = ".$lineid;
+
+            $result = $this->db->query($sql);
+            if ($result)
+            {
+                $obj = $this->db->fetch_object($result);
+
+                if ($obj)
+                {
+                    $product = new Product($this->db);
+                    $product->id = $obj->fk_product;
+
+                    // Delete line
+                    $line = new RepairLine($this->db);
+
+                    // For triggers
+                    $line->fetch($lineid);
+
+                    if ($line->delete() > 0)
+                    {
+                        $result=$this->update_price(1);
+
+                        if ($result > 0)
+                        {
+                            $this->db->commit();
+                            return 1;
+                        }
+                        else
+                        {
+                            $this->db->rollback();
+                            $this->error=$this->db->lasterror();
+                            return -1;
+                        }
+                    }
+                    else
+                    {
+                        $this->db->rollback();
+                        $this->error=$this->db->lasterror();
+                        return -1;
+                    }
+                }
+                else
+                {
+                    $this->db->rollback();
+                    return 0;
+                }
+            }
+            else
+            {
+                $this->db->rollback();
+                $this->error=$this->db->lasterror();
+                return -1;
+            }
+        }
+        else
+        {
+            return -1;
+        }
+    }
+
+    /**
      * 	Applique une remise relative
      *
      * 	@param     	User		$user		User qui positionne la remise
@@ -2176,9 +2382,554 @@ class Repair extends CommonOrder
     }
 
 
+    /**
+     *	Delete Repair
+     *
+     *	@param	User	$user		User object
+     *	@param	int		$notrigger	1=Does not execute triggers, 0= execuete triggers
+     * 	@return	int					<=0 if KO, >0 if OK
+     */
+    function delete($user, $notrigger=0)
+    {
+        global $conf, $langs;
+        require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
+        $error = 0;
+
+        $this->db->begin();
+
+        if (! $error && ! $notrigger)
+        {
+        	// Appel des triggers
+        	include_once DOL_DOCUMENT_ROOT . '/core/class/interfaces.class.php';
+        	$interface=new Interfaces($this->db);
+        	$result=$interface->run_triggers('DELETE_REPAIR',$this,$user,$langs,$conf);
+        	if ($result < 0) {
+        		$error++; $this->errors=$interface->errors;
+        	}
+        	// Fin appel triggers
+        }
+
+        if (! $error)
+        {
+        	// Delete order details
+        	$sql = 'DELETE FROM '.MAIN_DB_PREFIX."repairdet WHERE fk_repair = ".$this->id;
+        	dol_syslog(get_class($this)."::delete sql=".$sql);
+        	if (! $this->db->query($sql) )
+        	{
+        		dol_syslog(get_class($this)."::delete error", LOG_ERR);
+        		$error++;
+        	}
+
+        	// Delete order
+        	$sql = 'DELETE FROM '.MAIN_DB_PREFIX."repair WHERE rowid = ".$this->id;
+        	dol_syslog(get_class($this)."::delete sql=".$sql, LOG_DEBUG);
+        	if (! $this->db->query($sql) )
+        	{
+        		dol_syslog(get_class($this)."::delete error", LOG_ERR);
+        		$error++;
+        	}
+
+        	// Delete linked object
+        	$res = $this->deleteObjectLinked();
+        	if ($res < 0) $error++;
+
+        	// Delete linked contacts
+        	$res = $this->delete_linked_contact();
+        	if ($res < 0) $error++;
+
+        	// On efface le repertoire de pdf
+        	$comref = dol_sanitizeFileName($this->ref);
+        	if ($conf->repair->dir_output)
+        	{
+        		$dir = $conf->repair->dir_output . "/" . $comref ;
+        		$file = $conf->repair->dir_output . "/" . $comref . "/" . $comref . ".pdf";
+        		if (file_exists($file))	// We must delete all files before deleting directory
+        		{
+        			dol_delete_preview($this);
+
+        			if (! dol_delete_file($file,0,0,0,$this)) // For triggers
+        			{
+        				$this->db->rollback();
+        				return 0;
+        			}
+        		}
+        		if (file_exists($dir))
+        		{
+        			if (! dol_delete_dir_recursive($dir))
+        			{
+        				$this->error=$langs->trans("ErrorCanNotDeleteDir",$dir);
+        				$this->db->rollback();
+        				return 0;
+        			}
+        		}
+        	}
+        }
+
+        if (! $error)
+        {
+			$objmac = new Machine($this->db);
+			$objmac->clean($user, $notrigger);
+        	dol_syslog(get_class($this)."::delete $this->id by $user->id", LOG_DEBUG);
+        	$this->db->commit();
+        	return 1;
+        }
+        else
+        {
+            $this->error=$this->db->lasterror();
+            dol_syslog(get_class($this)."::delete ".$this->error, LOG_ERR);
+            $this->db->rollback();
+            return -1;
+        }
+    }
+
 
+    /**
+     *	Load indicators for dashboard (this->nbtodo and this->nbtodolate)
+     *
+     *	@param		User	$user   Object user
+     *	@return     int     		<0 if KO, >0 if OK
+     */
+    function load_board($user)
+    {
+        global $conf, $user;
+
+        $now=dol_now();
+
+        $this->nbtodo=$this->nbtodolate=0;
+        $clause = " WHERE";
+
+        $sql = "SELECT c.rowid, c.date_creation as datec, c.fk_statut";
+        $sql.= " FROM ".MAIN_DB_PREFIX."repair as c";
+        if (!$user->rights->societe->client->voir && !$user->societe_id)
+        {
+            $sql.= " LEFT JOIN ".MAIN_DB_PREFIX."societe_commerciaux as sc ON c.fk_soc = sc.fk_soc";
+            $sql.= " WHERE sc.fk_user = " .$user->id;
+            $clause = " AND";
+        }
+        $sql.= $clause." c.entity = ".$conf->entity;
+        //$sql.= " AND c.fk_statut IN (1,2,3) AND c.facture = 0";
+        $sql.= " AND ((c.fk_statut IN (1,2)) OR (c.fk_statut = 3 AND c.facture = 0))";    // If status is 2 and facture=1, it must be selected
+        if ($user->societe_id) $sql.=" AND c.fk_soc = ".$user->societe_id;
+
+        $resql=$this->db->query($sql);
+        if ($resql)
+        {
+            while ($obj=$this->db->fetch_object($resql))
+            {
+                $this->nbtodo++;
+                if ($obj->fk_statut != 3 && $this->db->jdate($obj->datec) < ($now - $conf->repair->client->warning_delay)) $this->nbtodolate++;
+            }
+            return 1;
+        }
+        else
+        {
+            $this->error=$this->db->error();
+            return -1;
+        }
+    }
+
+    /**
+     *	Return source label of order
+     *
+     *	@return     string      Label
+     */
+    function getLabelSource()
+    {
+        global $langs;
+
+        $label=$langs->trans('RepairSource'.$this->source);
+
+        if ($label == 'RepairSource') return '';
+        return $label;
+    }
+
+    /**
+     *	Return status label of Repair
+     *
+     *	@param      int		$mode       0=libelle long, 1=libelle court, 2=Picto + Libelle court, 3=Picto, 4=Picto + Libelle long, 5=Libelle court + Picto
+     *	@return     string      		Libelle
+     */
+    function getLibStatut($mode)
+    {
+        return $this->LibStatut($this->statut,$this->facturee,$mode);
+    }
+
+    /**
+     *	Return label of status
+     *
+     *	@param		int		$statut      	Id statut
+     *  @param      int		$facturee    	if invoiced
+     *	@param      int		$mode        	0=libelle long, 1=libelle court, 2=Picto + Libelle court, 3=Picto, 4=Picto + Libelle long, 5=Libelle court + Picto
+     *  @return     string					Label of status
+     */
+    function LibStatut($statut,$facturee,$mode)
+    {
+        global $langs;
+        //print 'x'.$statut.'-'.$facturee;
+        if ($mode == 0) //libelle long
+        {
+            if ($statut==-1) return $langs->trans('StatusRepairCanceled');
+            if ($statut==0 && $on_process == 0) return $langs->trans('StatusRepairDraft');
+            if ($statut==0 && $on_process == 1) return $langs->trans('StatusRepairOnProcess');
+            if ($statut==1) return $langs->trans('StatusRepairValidated');
+            if ($statut==2) return $langs->trans('StatusRepairSentShort');
+            if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairToBill');
+            if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairProcessed');
+        
+        }
+        elseif ($mode == 1) //libelle court
+        {
+			if ($statut==-1) return $langs->trans('StatusRepairCanceledShort');
+            if ($statut==0 && $on_process == 0) return $langs->trans('StatusRepairDraftShort');
+            if ($statut==0 && $on_process == 1) return $langs->trans('StatusRepairOnProcessShort');
+            if ($statut==1) return $langs->trans('StatusRepairValidatedShort');
+            if ($statut==2) return $langs->trans('StatusRepairSentShort');
+            if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairToBillShort');
+            if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairProcessed');
+        }
+        elseif ($mode == 2) //Picto + Libelle court
+        {
+            if ($statut==-1) return img_picto($langs->trans('StatusRepairCanceled'),'statut5').' '.$langs->trans('StatusRepairCanceledShort');
+            if ($statut==0 && $on_process == 0) return img_picto($langs->trans('StatusRepairDraft'),'statut0').' '.$langs->trans('StatusRepairDraftShort');
+            if ($statut==0 && $on_process == 1) return img_picto($langs->trans('StatusRepairOnProcess'),'statut0').' '.$langs->trans('StatusRepairOnProcessShort');
+            if ($statut==1) return img_picto($langs->trans('StatusRepairValidated'),'statut1').' '.$langs->trans('StatusRepairValidatedShort');
+            if ($statut==2) return img_picto($langs->trans('StatusRepairSent'),'statut3').' '.$langs->trans('StatusRepairSentShort');
+            if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairToBill'),'statut7').' '.$langs->trans('StatusRepairToBillShort');
+            if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairProcessed'),'statut6').' '.$langs->trans('StatusRepairProcessedShort');
+        }
+        elseif ($mode == 3) //Picto
+        {
+            if ($statut==-1) return img_picto($langs->trans('StatusRepairCanceled'),'statut5');
+            if ($statut==0 && $on_process == 0) return img_picto($langs->trans('StatusRepairDraft'),'statut0');
+            if ($statut==0 && $on_process == 1) return img_picto($langs->trans('StatusRepairOnProcess'),'statut0');
+            if ($statut==1) return img_picto($langs->trans('StatusRepairValidated'),'statut1');
+            if ($statut==2) return img_picto($langs->trans('StatusRepairSentShort'),'statut3');
+            if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairToBill'),'statut7');
+            if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairProcessed'),'statut6');
+        }
+        elseif ($mode == 4) //Picto + Libelle long
+        {
+            if ($statut==-1) return img_picto($langs->trans('StatusRepairCanceled'),'statut5').' '.$langs->trans('StatusRepairCanceled');
+            if ($statut==0 && $on_process == 0) return img_picto($langs->trans('StatusRepairDraft'),'statut0').' '.$langs->trans('StatusRepairDraft');
+            if ($statut==0 && $on_process == 1) return img_picto($langs->trans('StatusRepairOnProcess'),'statut0').' '.$langs->trans('StatusRepairOnProcess');
+            if ($statut==1) return img_picto($langs->trans('StatusRepairValidated'),'statut1').' '.$langs->trans('StatusRepairValidated');
+            if ($statut==2) return img_picto($langs->trans('StatusRepairSentShort'),'statut3').' '.$langs->trans('StatusRepairSent');
+            if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairToBill'),'statut7').' '.$langs->trans('StatusRepairToBill');
+            if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairProcessed'),'statut6').' '.$langs->trans('StatusRepairProcessed');
+        }
+        elseif ($mode == 5) //Libelle court + Picto
+        {
+            if ($statut==-1) return $langs->trans('StatusRepairCanceledShort').' '.img_picto($langs->trans('StatusRepairCanceled'),'statut5');
+            if ($statut==0 && $on_process == 0) return $langs->trans('StatusRepairDraftShort').' '.img_picto($langs->trans('StatusRepairDraft'),'statut0');
+            if ($statut==0 && $on_process == 1) return $langs->trans('StatusRepairOnProcessShort').' '.img_picto($langs->trans('StatusRepairOnProcess'),'statut0');
+            if ($statut==1) return $langs->trans('StatusRepairValidatedShort').' '.img_picto($langs->trans('StatusRepairValidated'),'statut1');
+            if ($statut==2) return $langs->trans('StatusRepairSentShort').' '.img_picto($langs->trans('StatusRepairSent'),'statut3');
+            if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairToBillShort').' '.img_picto($langs->trans('StatusRepairToBill'),'statut7');
+            if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairProcessedShort').' '.img_picto($langs->trans('StatusRepairProcessed'),'statut6');
+        }
+    }
+
+
+    /**
+     *	Return clicable link of object (with eventually picto)
+     *
+     *	@param      int			$withpicto      Add picto into link
+     *	@param      int			$option         Where point the link
+     *	@param      int			$max          	Max length to show
+     *	@param      int			$short			Use short labels
+     *	@return     string          		String with URL
+     */
+    function getNomUrl($withpicto=0,$option=0,$max=0,$short=0)
+    {
+        global $conf, $langs;
+
+        $result='';
+
+/*        if ($conf->expedition->enabled && ($option == 1 || $option == 2)) $url = DOL_URL_ROOT.'/expedition/shipment.php?id='.$this->id;
+        else*/ $url = DOL_URL_ROOT.'/repair/fiche.php?id='.$this->id;
+
+        if ($short) return $url;
+
+        $linkstart = '<a href="'.$url.'">';
+        $linkend='</a>';
+
+        $picto='repair@repair';
+        $label=$langs->trans("ShowRepair").': '.$this->ref;
+
+        if ($withpicto) $result.=($linkstart.img_object($label,$picto).$linkend);
+        if ($withpicto && $withpicto != 2) $result.=' ';
+        $result.=$linkstart.$this->ref.$linkend;
+        return $result;
+    }
+
+
+    /**
+     *	Charge les informations d'ordre info dans l'objet repair
+     *
+     *	@param  int		$id       Id of order
+     *	@return	void
+     */
+    function info($id)
+    {
+        $sql = 'SELECT c.rowid, date_creation as datec, tms as datem,';
+        $sql.= ' date_valid as datev,';
+        $sql.= ' date_cloture as datecloture,';
+        $sql.= ' fk_user_author, fk_user_valid, fk_user_cloture';
+        $sql.= ' FROM '.MAIN_DB_PREFIX.'repair as c';
+        $sql.= ' WHERE c.rowid = '.$id;
+        $result=$this->db->query($sql);
+        if ($result)
+        {
+            if ($this->db->num_rows($result))
+            {
+                $obj = $this->db->fetch_object($result);
+                $this->id = $obj->rowid;
+                if ($obj->fk_user_author)
+                {
+                    $cuser = new User($this->db);
+                    $cuser->fetch($obj->fk_user_author);
+                    $this->user_creation   = $cuser;
+                }
+
+                if ($obj->fk_user_valid)
+                {
+                    $euser = new User($this->db);
+                    $euser->fetch($obj->fk_user_valid);
+                    $this->user_validation = $vuser;
+                }
+
+                if ($obj->fk_user_cloture)
+                {
+                    $cluser = new User($this->db);
+                    $cluser->fetch($obj->fk_user_cloture);
+                    $this->user_cloture   = $cluser;
+                }
+
+                $this->date_creation     = $this->db->jdate($obj->datec);
+                $this->date_modification = $this->db->jdate($obj->datem);
+                $this->date_validation   = $this->db->jdate($obj->datev);
+                $this->date_cloture      = $this->db->jdate($obj->datecloture);
+            }
+
+            $this->db->free($result);
+
+        }
+        else
+        {
+            dol_print_error($this->db);
+        }
+    }
+
+
+    /**
+     *  Initialise an instance with random values.
+     *  Used to build previews or test instances.
+     *	id must be 0 if object instance is a specimen.
+     *
+     *  @return	void
+     */
+    function initAsSpecimen()
+    {
+        global $user,$langs,$conf;
+
+        dol_syslog(get_class($this)."::initAsSpecimen");
+
+        // Charge tableau des produits prodids
+        $prodids = array();
+        $sql = "SELECT rowid";
+        $sql.= " FROM ".MAIN_DB_PREFIX."product";
+        $sql.= " WHERE entity IN (".getEntity('product', 1).")";
+        $resql = $this->db->query($sql);
+        if ($resql)
+        {
+            $num_prods = $this->db->num_rows($resql);
+            $i = 0;
+            while ($i < $num_prods)
+            {
+                $i++;
+                $row = $this->db->fetch_row($resql);
+                $prodids[$i] = $row[0];
+            }
+        }
+
+		$objmac = new Machine($this->db);
+		$objmac->initAsSpecimen();
+        // Initialise parametres
+        $this->id=0;
+        $this->ref = 'SPECIMEN';
+        $this->specimen=1;
+        $this->socid = 1;
+		$this->trademark = $objmac->trademark;
+		$this->model = $objmac->model;
+		$this->type_id = $objmac->type_id;
+		$this->n_model = $objmac->n_model;
+		$this->serial_num = $objmac->serial_num;
+		$this->breakdown = "ne fonctionne plus";
+		$this->support_id = "Mag";
+		$this->accessory = "cordon d'alimentation";
+        $this->date = time();
+        $this->date_lim_reglement=$this->date+3600*24*30;
+        $this->cond_reglement_code = 'RECEP';
+        $this->mode_reglement_code = 'CHQ';
+        $this->availability_code   = 'DSP';
+        $this->demand_reason_code  = 'SRC_00';
+        $this->note_public='This is a comment (public)';
+        $this->note='This is a comment (private)';
+        // Lines
+        $nbp = 5;
+        $xnbp = 0;
+        while ($xnbp < $nbp)
+        {
+            $line=new RepairLine($this->db);
+
+            $line->desc=$langs->trans("Description")." ".$xnbp;
+            $line->qty=1;
+            $line->subprice=100;
+            $line->price=100;
+            $line->tva_tx=19.6;
+            if ($xnbp == 2)
+            {
+                $line->total_ht=50;
+                $line->total_ttc=59.8;
+                $line->total_tva=9.8;
+                $line->remise_percent=50;
+            }
+            else
+            {
+                $line->total_ht=100;
+                $line->total_ttc=119.6;
+                $line->total_tva=19.6;
+                $line->remise_percent=0;
+            }
+            $prodid = rand(1, $num_prods);
+            $line->fk_product=$prodids[$prodid];
+
+            $this->lines[$xnbp]=$line;
+
+            $this->total_ht       += $line->total_ht;
+            $this->total_tva      += $line->total_tva;
+            $this->total_ttc      += $line->total_ttc;
+
+            $xnbp++;
+        }
+    }
+
+
+    /**
+     *	Charge indicateurs this->nb de tableau de bord
+     *
+     *	@return     int         <0 si ko, >0 si ok
+     */
+    function load_state_board()
+    {
+        global $conf, $user;
+
+        $this->nb=array();
+        $clause = "WHERE";
+
+        $sql = "SELECT count(co.rowid) as nb";
+        $sql.= " FROM ".MAIN_DB_PREFIX."repair as co";
+        $sql.= " LEFT JOIN ".MAIN_DB_PREFIX."societe as s ON co.fk_soc = s.rowid";
+        if (!$user->rights->societe->client->voir && !$user->societe_id)
+        {
+            $sql.= " LEFT JOIN ".MAIN_DB_PREFIX."societe_commerciaux as sc ON s.rowid = sc.fk_soc";
+            $sql.= " WHERE sc.fk_user = " .$user->id;
+            $clause = "AND";
+        }
+        $sql.= " ".$clause." co.entity = ".$conf->entity;
+
+        $resql=$this->db->query($sql);
+        if ($resql)
+        {
+            while ($obj=$this->db->fetch_object($resql))
+            {
+                $this->nb["repairs"]=$obj->nb;
+            }
+            return 1;
+        }
+        else
+        {
+            dol_print_error($this->db);
+            $this->error=$this->db->error();
+            return -1;
+        }
+    }
+
+    /**
+     * 	Return an array of order lines
+     *
+     * @return	array		Lines of order
+     */
+    function getLinesArray()
+    {
+        $lines = array();
+
+        $sql = 'SELECT l.rowid, l.fk_product, l.product_type, l.label as custom_label, l.description, l.price, l.qty, l.tva_tx, ';
+        $sql.= ' l.fk_remise_except, l.remise_percent, l.subprice, l.info_bits, l.rang, l.special_code, l.fk_parent_line,';
+        $sql.= ' l.total_ht, l.total_tva, l.total_ttc, l.fk_product_fournisseur_price as fk_fournprice, l.buy_price_ht as pa_ht, l.localtax1_tx, l.localtax2_tx,';
+        $sql.= ' l.date_start, l.date_end,';
+        $sql.= ' p.label as product_label, p.ref, p.fk_product_type, p.rowid as prodid, ';
+        $sql.= ' p.description as product_desc, p.stock as stock_reel';
+        $sql.= ' FROM '.MAIN_DB_PREFIX.'repairdet as l';
+        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'product as p ON l.fk_product=p.rowid';
+        $sql.= ' WHERE l.fk_repair = '.$this->id;
+        $sql.= ' ORDER BY l.rang ASC, l.rowid';
+
+        $resql = $this->db->query($sql);
+        if ($resql)
+        {
+            $num = $this->db->num_rows($resql);
+            $i = 0;
+
+            while ($i < $num)
+            {
+                $obj = $this->db->fetch_object($resql);
+
+                $this->lines[$i]->id				= $obj->rowid;
+                $this->lines[$i]->label 			= $obj->custom_label;
+                $this->lines[$i]->description 		= $obj->description;
+                $this->lines[$i]->fk_product		= $obj->fk_product;
+                $this->lines[$i]->ref				= $obj->ref;
+                $this->lines[$i]->product_label		= $obj->product_label;
+                $this->lines[$i]->product_desc		= $obj->product_desc;
+                $this->lines[$i]->fk_product_type	= $obj->fk_product_type;
+                $this->lines[$i]->product_type		= $obj->product_type;
+                $this->lines[$i]->qty				= $obj->qty;
+                $this->lines[$i]->subprice			= $obj->subprice;
+                $this->lines[$i]->fk_remise_except 	= $obj->fk_remise_except;
+                $this->lines[$i]->remise_percent	= $obj->remise_percent;
+                $this->lines[$i]->tva_tx			= $obj->tva_tx;
+                $this->lines[$i]->info_bits			= $obj->info_bits;
+                $this->lines[$i]->total_ht			= $obj->total_ht;
+                $this->lines[$i]->total_tva			= $obj->total_tva;
+                $this->lines[$i]->total_ttc			= $obj->total_ttc;
+                $this->lines[$i]->fk_parent_line	= $obj->fk_parent_line;
+                $this->lines[$i]->special_code		= $obj->special_code;
+				$this->lines[$i]->stock				= $obj->stock_reel;
+                $this->lines[$i]->rang				= $obj->rang;
+                $this->lines[$i]->date_start		= $this->db->jdate($obj->date_start);
+                $this->lines[$i]->date_end			= $this->db->jdate($obj->date_end);
+				$this->lines[$i]->fk_fournprice		= $obj->fk_fournprice;
+				$marginInfos						= getMarginInfos($obj->subprice, $obj->remise_percent, $obj->tva_tx, $obj->localtax1_tx, $obj->localtax2_tx, $this->lines[$i]->fk_fournprice, $obj->pa_ht);
+				$this->lines[$i]->pa_ht				= $marginInfos[0];
+				$this->lines[$i]->marge_tx			= $marginInfos[1];
+				$this->lines[$i]->marque_tx			= $marginInfos[2];
+
+                $i++;
+            }
 
+            $this->db->free($resql);
 
+            return 1;
+        }
+        else
+        {
+            $this->error=$this->db->error();
+            dol_syslog("Error sql=$sql, error=".$this->error,LOG_ERR);
+            return -1;
+        }
+    }
 
 
 
@@ -2294,6 +3045,12 @@ class Repair extends CommonOrder
 
 
 
+
+
+
+
+
+//<Tathar>
 
     /**
      *	Make Repair
@@ -2653,479 +3410,6 @@ class Repair extends CommonOrder
     }
 
 
-
-    /**
-     *	Validate order
-     *
-     *	@param		User	$user     		User making status change
-     *	@param		int		$idwarehouse	Id of warehouse to use for stock decrease
-     *	@return  	int						<=0 if OK, >0 if KO
-     */
-/*    function valid($user, $idwarehouse=0)
-    {
-        global $conf,$langs;
-        require_once(DOL_DOCUMENT_ROOT."/core/lib/files.lib.php");
-
-        $error=0;
-
-        // Protection
-        if ($this->statut == 1)
-        {
-            dol_syslog(get_class($this)."::valid no draft status", LOG_WARNING);
-            return 0;
-        }
-
-        if (! $user->rights->repair->valider)
-        {
-            $this->error='Permission denied';
-            dol_syslog(get_class($this)."::valid ".$this->error, LOG_ERR);
-            return -1;
-        }
-
-        $now=dol_now();
-
-        $this->db->begin();
-
-        // Definition du nom de module de numerotation de repair
-        $soc = new Societe($this->db);
-        $soc->fetch($this->socid);
-
-        // Class of company linked to order
-        $result=$soc->set_as_client();
-
-        // Define new ref
-        if (! $error && (preg_match('/^[\(]?PROV/i', $this->ref)))
-        {
-            $num = $this->getNextNumRef($soc);
-        }
-        else
-        {
-            $num = $this->ref;
-        }
-
-        // Validate
-        $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
-        $sql.= " SET ref = '".$num."',";
-        $sql.= " fk_statut = 1,";
-        $sql.= " date_valid='".$this->db->idate($now)."',";
-        $sql.= " fk_user_valid = ".$user->id;
-        $sql.= " WHERE rowid = ".$this->id;
-
-        dol_syslog(get_class($this)."::valid() sql=".$sql);
-        $resql=$this->db->query($sql);
-        if (! $resql)
-        {
-            dol_syslog(get_class($this)."::valid Echec update - 10 - sql=".$sql, LOG_ERR);
-            dol_print_error($this->db);
-            $error++;
-        }
-
-        if (! $error)
-        {
-            // If stock is incremented on validate order, we must increment it
-            if ($result >= 0 && $conf->stock->enabled && $conf->global->STOCK_CALCULATE_ON_VALIDATE_ORDER == 1)
-            {
-                require_once(DOL_DOCUMENT_ROOT."/product/stock/class/mouvementstock.class.php");
-                $langs->load("agenda");
-
-                // Loop on each line
-                $cpt=count($this->lines);
-                for ($i = 0; $i < $cpt; $i++)
-                {
-                    if ($this->lines[$i]->fk_product > 0)
-                    {
-                        $mouvP = new MouvementStock($this->db);
-                        // We decrement stock of product (and sub-products)
-                        $result=$mouvP->livraison($user, $this->lines[$i]->fk_product, $idwarehouse, $this->lines[$i]->qty, $this->lines[$i]->subprice, $langs->trans("RepairValidatedInDolibarr",$num));
-                        if ($result < 0) { $error++; }
-                    }
-                }
-            }
-        }
-
-        if (! $error)
-        {
-            $this->oldref='';
-
-            // Rename directory if dir was a temporary ref
-            if (preg_match('/^[\(]?PROV/i', $this->ref))
-            {
-                // On renomme repertoire ($this->ref = ancienne ref, $numfa = nouvelle ref)
-                // afin de ne pas perdre les fichiers attaches
-                $comref = dol_sanitizeFileName($this->ref);
-                $snum = dol_sanitizeFileName($num);
-                $dirsource = $conf->repair->dir_output.'/'.$comref;
-                $dirdest = $conf->repair->dir_output.'/'.$snum;
-                if (file_exists($dirsource))
-                {
-                    dol_syslog(get_class($this)."::valid() rename dir ".$dirsource." into ".$dirdest);
-
-                    if (@rename($dirsource, $dirdest))
-                    {
-                        $this->oldref = $comref;
-
-                        dol_syslog("Rename ok");
-                        // Suppression ancien fichier PDF dans nouveau rep
-                        dol_delete_file($conf->repair->dir_output.'/'.$snum.'/'.$comref.'*.*');
-                    }
-                }
-            }
-        }
-
-        // Set new ref and current status
-        if (! $error)
-        {
-            $this->ref = $num;
-            $this->statut = 1;
-        }
-
-        if (! $error)
-        {
-            // Appel des triggers
-            include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
-            $interface=new Interfaces($this->db);
-            $result=$interface->run_triggers('ORDER_VALIDATE',$this,$user,$langs,$conf);
-            if ($result < 0) { $error++; $this->errors=$interface->errors; }
-            // Fin appel triggers
-        }
-
-        if (! $error)
-        {
-            $this->db->commit();
-            return 1;
-        }
-        else
-        {
-            $this->db->rollback();
-            $this->error=$this->db->lasterror();
-            return -1;
-        }
-    }
-*/
-
-
-
-
-    /**
-     *	Delete Repair
-     *
-     *	@param	User	$user		User object
-     *	@param	int		$notrigger	1=Does not execute triggers, 0= execuete triggers
-     * 	@return	int					<=0 if KO, >0 if OK
-     */
-    function delete($user, $notrigger=0)
-    {
-        global $conf, $langs;
-        require_once(DOL_DOCUMENT_ROOT."/core/lib/files.lib.php");
-
-        $error = 0;
-		
-		// Protection
-        if (($this->repair_statut >= 3 ) || ($this->repair_statut < 0 ))
-        {
-			dol_syslog(get_class($this)."::delete wrong status ".$this->repair_statut, LOG_WARNING);
-            return 0;
-        }
-
-        $this->db->begin();
-
-        if (! $error && ! $notrigger)
-        {
-        	// Appel des triggers
-        	include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
-        	$interface=new Interfaces($this->db);
-        	$result=$interface->run_triggers('DELETE_REPAIR',$this,$user,$langs,$conf);
-        	if ($result < 0) {
-        		$error++; $this->errors=$interface->errors;
-        	}
-        	// Fin appel triggers
-        }
-
-        if (! $error)
-        {
-        	// Delete order details
-        	$sql = 'DELETE FROM '.MAIN_DB_PREFIX."repairdet WHERE fk_repair = ".$this->id;
-        	dol_syslog("Repair::delete sql=".$sql);
-        	if (! $this->db->query($sql) )
-        	{
-        		dol_syslog(get_class($this)."::delete error", LOG_ERR);
-        		$error++;
-        	}
-
-        	// Delete order
-        	$sql = 'DELETE FROM '.MAIN_DB_PREFIX."repair WHERE rowid = ".$this->id;
-        	dol_syslog(get_class($this)."::delete sql=".$sql, LOG_DEBUG);
-        	if (! $this->db->query($sql) )
-        	{
-        		dol_syslog(get_class($this)."::delete error", LOG_ERR);
-        		$error++;
-        	}
-
-        	// Delete linked object
-        	$res = $this->deleteObjectLinked();
-        	if ($res < 0) $error++;
-
-        	// Delete linked contacts
-        	$res = $this->delete_linked_contact();
-        	if ($res < 0) $error++;
-
-        	// On efface le repertoire de pdf
-        	$comref = dol_sanitizeFileName($this->ref);
-        	if ($conf->repair->dir_output)
-        	{
-        		$dir = $conf->repair->dir_output . "/" . $comref ;
-        		$file = $conf->repair->dir_output . "/" . $comref . "/" . $comref . ".pdf";
-        		if (file_exists($file))	// We must delete all files before deleting directory
-        		{
-        			dol_delete_preview($this);
-
-        			if (! dol_delete_file($file,0,0,0,$this)) // For triggers
-        			{
-        				$this->error=$langs->trans("ErrorCanNotDeleteFile",$file);
-        				$this->db->rollback();
-        				return 0;
-        			}
-        		}
-        		if (file_exists($dir))
-        		{
-        			if (! dol_delete_dir_recursive($dir))
-        			{
-        				$this->error=$langs->trans("ErrorCanNotDeleteDir",$dir);
-        				$this->db->rollback();
-        				return 0;
-        			}
-        		}
-        	}
-        }
-
-        if (! $error)
-        {
-			$objmac = new Machine($this->db);
-			$objmac->clean($user, $notrigger);
-        	dol_syslog(get_class($this)."::delete $this->id by $user->id", LOG_DEBUG);
-        	$this->db->commit();
-        	return 1;
-        }
-        else
-        {
-            $this->error=$this->db->lasterror();
-            dol_syslog(get_class($this)."::delete ".$this->error, LOG_ERR);
-            $this->db->rollback();
-            return -1;
-        }
-    }
-
-
-
-
-
-    /**
-     *	Load array this->expeditions of nb of products sent by line in order
-     *
-     *	@param      int		$filtre_statut      Filter on status
-     * 	@return     int                			<0 if KO, Nb of lines found if OK
-     *
-     *	TODO deprecated, move to Shipping class
-     */
-    function loadExpeditions($filtre_statut=-1)
-    {
-        $num=0;
-        $this->expeditions = array();
-
-        $sql = 'SELECT cd.rowid, cd.fk_product,';
-        $sql.= ' sum(ed.qty) as qty';
-        $sql.= ' FROM '.MAIN_DB_PREFIX.'expeditiondet as ed,';
-        if ($filtre_statut >= 0) $sql.= ' '.MAIN_DB_PREFIX.'expedition as e,';
-        $sql.= ' '.MAIN_DB_PREFIX.'repairdet as cd';
-        $sql.= ' WHERE';
-        if ($filtre_statut >= 0) $sql.= ' ed.fk_expedition = e.rowid AND';
-        $sql.= ' ed.fk_origin_line = cd.rowid';
-        $sql.= ' AND cd.fk_repair =' .$this->id;
-        if ($filtre_statut >= 0) $sql.=' AND e.fk_statut = '.$filtre_statut;
-        $sql.= ' GROUP BY cd.rowid, cd.fk_product';
-        //print $sql;
-
-        dol_syslog("Repair::loadExpeditions sql=".$sql,LOG_DEBUG);
-        $result = $this->db->query($sql);
-        if ($result)
-        {
-            $num = $this->db->num_rows($result);
-            $i = 0;
-            while ($i < $num)
-            {
-                $obj = $this->db->fetch_object($result);
-                $this->expeditions[$obj->rowid] = $obj->qty;
-                $i++;
-            }
-            $this->db->free();
-            return $num;
-        }
-        else
-        {
-            $this->error=$this->db->lasterror();
-            dol_syslog("Repair::loadExpeditions ".$this->error,LOG_ERR);
-            return -1;
-        }
-
-    }
-
-    /**
-     * Returns a array with expeditions lines number
-     *
-     * @return	int		Nb of shipments
-     *
-     * TODO deprecated, move to Shipping class
-     */
-    function nb_expedition()
-    {
-        $sql = 'SELECT count(*)';
-        $sql.= ' FROM '.MAIN_DB_PREFIX.'expedition as e';
-        $sql.= ', '.MAIN_DB_PREFIX.'element_element as el';
-        $sql.= ' WHERE el.fk_source = '.$this->id;
-        $sql.= " AND el.fk_target = e.rowid";
-        $sql.= " AND el.targettype = 'shipping'";
-
-        $resql = $this->db->query($sql);
-        if ($resql)
-        {
-            $row = $this->db->fetch_row($resql);
-            return $row[0];
-        }
-        else dol_print_error($this->db);
-    }
-
-    /**
-     *	Return a array with sendings by line
-     *
-     *	@param      int		$filtre_statut      Filtre sur statut
-     *	@return     int                 		0 si OK, <0 si KO
-     *
-     *	TODO  deprecated, move to Shipping class
-     */
-    function livraison_array($filtre_statut=-1)
-    {
-        $delivery = new Livraison($this->db);
-        $deliveryArray = $delivery->livraison_array($filtre_statut);
-        return $deliveryArray;
-    }
-
-    /**
-     *	Return a array with the pending stock by product
-     *
-     *	@param      int		$filtre_statut      Filtre sur statut
-     *	@return     int                 		0 si OK, <0 si KO
-     *
-     *	TODO		FONCTION NON FINIE A FINIR
-     */
-    function stock_array($filtre_statut=-1)
-    {
-        $this->stocks = array();
-
-        // Tableau des id de produit de la repair
-		$array_of_product=array();
-
-        // Recherche total en stock pour chaque produit
-        // TODO $array_of_product est défini vide juste au dessus !!
-        if (count($array_of_product))
-        {
-            $sql = "SELECT fk_product, sum(ps.reel) as total";
-            $sql.= " FROM ".MAIN_DB_PREFIX."product_stock as ps";
-            $sql.= " WHERE ps.fk_product IN (".join(',',$array_of_product).")";
-            $sql.= ' GROUP BY fk_product ';
-            $result = $this->db->query($sql);
-            if ($result)
-            {
-                $num = $this->db->num_rows($result);
-                $i = 0;
-                while ($i < $num)
-                {
-                    $obj = $this->db->fetch_object($result);
-                    $this->stocks[$obj->fk_product] = $obj->total;
-                    $i++;
-                }
-                $this->db->free();
-            }
-        }
-        return 0;
-    }
-
-    /**
-     *  Delete an order line
-     *
-     *  @param      int		$lineid		Id of line to delete
-     *  @return     int        		 	>0 if OK, 0 if nothing to do, <0 if KO
-     */
-    function deleteline($lineid)
-    {
-        global $user;
-
-        if ($this->statut == 0)
-        {
-            $this->db->begin();
-
-            $sql = "SELECT fk_product, qty";
-            $sql.= " FROM ".MAIN_DB_PREFIX."repairdet";
-            $sql.= " WHERE rowid = ".$lineid;
-
-            $result = $this->db->query($sql);
-            if ($result)
-            {
-                $obj = $this->db->fetch_object($result);
-
-                if ($obj)
-                {
-                    $product = new Product($this->db);
-                    $product->id = $obj->fk_product;
-
-                    // Delete line
-                    $line = new RepairLine($this->db);
-
-                    // For triggers
-                    $line->fetch($lineid);
-
-                    if ($line->delete() > 0)
-                    {
-                        $result=$this->update_price(1);
-
-                        if ($result > 0)
-                        {
-                            $this->db->commit();
-                            return 1;
-                        }
-                        else
-                        {
-                            $this->db->rollback();
-                            $this->error=$this->db->lasterror();
-                            return -1;
-                        }
-                    }
-                    else
-                    {
-                        $this->db->rollback();
-                        $this->error=$this->db->lasterror();
-                        return -1;
-                    }
-                }
-                else
-                {
-                    $this->db->rollback();
-                    return 0;
-                }
-            }
-            else
-            {
-                $this->db->rollback();
-                $this->error=$this->db->lasterror();
-                return -1;
-            }
-        }
-        else
-        {
-            return -1;
-        }
-    }
-
-//<Tathar>
     /**
      *	Set trademark
      *
@@ -3427,57 +3711,7 @@ class Repair extends CommonOrder
         }
     }
 
-
 //</Tathar>
-
-
-
-
-    /**
-     *	Load indicators for dashboard (this->nbtodo and this->nbtodolate)
-     *
-     *	@param		User	$user   Object user
-     *	@return     int     		<0 if KO, >0 if OK
-     */
-    function load_board($user)
-    {
-        global $conf, $user;
-
-        $now=dol_now();
-
-        $this->nbtodo=$this->nbtodolate=0;
-        $clause = " WHERE";
-
-        $sql = "SELECT c.rowid, c.date_creation as datec, c.fk_statut";
-        $sql.= " FROM ".MAIN_DB_PREFIX."repair as c";
-        if (!$user->rights->societe->client->voir && !$user->societe_id)
-        {
-            $sql.= " LEFT JOIN ".MAIN_DB_PREFIX."societe_commerciaux as sc ON c.fk_soc = sc.fk_soc";
-            $sql.= " WHERE sc.fk_user = " .$user->id;
-            $clause = " AND";
-        }
-        $sql.= $clause." c.entity = ".$conf->entity;
-        //$sql.= " AND c.fk_statut IN (1,2,3) AND c.facture = 0";
-        $sql.= " AND ((c.fk_statut IN (1,2)) OR (c.fk_statut = 3 AND c.facture = 0))";    // If status is 2 and facture=1, it must be selected
-        if ($user->societe_id) $sql.=" AND c.fk_soc = ".$user->societe_id;
-
-        $resql=$this->db->query($sql);
-        if ($resql)
-        {
-            while ($obj=$this->db->fetch_object($resql))
-            {
-                $this->nbtodo++;
-                if ($obj->fk_statut != 3 && $this->db->jdate($obj->datec) < ($now - $conf->repair->client->warning_delay)) $this->nbtodolate++;
-            }
-            return 1;
-        }
-        else
-        {
-            $this->error=$this->db->error();
-            return -1;
-        }
-    }
-
 
 	/**
 	 *    Return label of a Support code
@@ -3509,447 +3743,6 @@ class Repair extends CommonOrder
 			return $label;
 		}
 	}
-
-    /**
-     *	Return source label of order
-     *
-     *	@return     string      Label
-     */
-    function getLabelSource()
-    {
-        global $langs;
-
-        $label=$langs->trans('RepairSource'.$this->source);
-
-        if ($label == 'RepairSource') return '';
-        return $label;
-    }
-
-    /**
-     *	Return status label of Repair
-     *
-     *	@param      int		$mode       0=libelle long, 1=libelle court, 2=Picto + Libelle court, 3=Picto, 4=Picto + Libelle long, 5=Libelle court + Picto
-     *	@return     string      		Libelle
-     */
-    function getLibStatut($mode)
-    {
-        return $this->LibStatut($this->repair_statut,$this->facturee,$mode);
-    }
-
-    /**
-     *	Return label of status
-     *
-     *	@param		int		$statut      	Id statut
-     *  @param      int		$facturee    	if invoiced
-     *	@param      int		$mode        	0=libelle long, 1=libelle court, 2=Picto + Libelle court, 3=Picto, 4=Picto + Libelle long, 5=Libelle court + Picto
-     *  @return     string					Label of status
-     */
-
-    function LibStatut($repair_statut,$facturee,$mode)
-    {
-        global $langs;
-        //print 'x'.$statut.'-'.$facturee;
-        if ($mode == 0) //libelle long
-        {
-            if ($repair_statut==-2) return $langs->trans('StatusRepairRefusedEstimate');
-            if ($repair_statut==-1) return $langs->trans('StatusRepairCanceled');
-            if ($repair_statut==0) return $langs->trans('StatusRepairWaitingEstimate');
-            if ($repair_statut==1) return $langs->trans('StatusRepairEstimatesDuring');
-            if ($repair_statut==2) return $langs->trans('StatusRepairEstimatesComplete');
-            if ($repair_statut==3) return $langs->trans('StatusRepairEstimatesValidate');
-            if ($repair_statut==4) return $langs->trans('StatusRepairAcceptedEstimate');
-            if ($repair_statut==5) return $langs->trans('StatusRepairInProgress');
-            if ($repair_statut==6) return $langs->trans('StatusRepairComplete');
-            if ($repair_statut==7) return $langs->trans('StatusRepairValidate');
-            if ($repair_statut==8 && ! $facturee) return $langs->trans('StatusRepairToBill');
-            if ($repair_statut==8 && $facturee) return $langs->trans('StatusRepairProcessed');
-        }
-        elseif ($mode == 1) //libelle court
-        {
-            if ($repair_statut==-2) return $langs->trans('StatusRepairRefusedEstimateShort');
-            if ($repair_statut==-1) return $langs->trans('StatusRepairCanceledShort');
-            if ($repair_statut==0) return $langs->trans('StatusRepairWaitingEstimateShort');
-            if ($repair_statut==1) return $langs->trans('StatusRepairEstimatesDuringShort');
-            if ($repair_statut==2) return $langs->trans('StatusRepairEstimatesCompleteShort');
-            if ($repair_statut==3) return $langs->trans('StatusRepairEstimatesValidateShort');
-            if ($repair_statut==4) return $langs->trans('StatusRepairAcceptedEstimateShort');
-            if ($repair_statut==5) return $langs->trans('StatusRepairInProgressShort');
-            if ($repair_statut==6) return $langs->trans('StatusRepairCompleteShort');
-            if ($repair_statut==7) return $langs->trans('StatusRepairValidateShort');
-            if ($repair_statut==8 && ! $facturee) return $langs->trans('StatusRepairToBillShort');
-            if ($repair_statut==8 && $facturee) return $langs->trans('StatusRepairProcessed');
-        }
-        elseif ($mode == 2) //Picto + Libelle court
-        {
-            if ($repair_statut==-2) return img_picto($langs->trans('StatusRepairCanceled'),'statut5').' '.$langs->trans('StatusRepairRefusedEstimateShort');
-            if ($repair_statut==-1) return img_picto($langs->trans('StatusRepairCanceled'),'statut5').' '.$langs->trans('StatusRepairCanceledShort');
-            if ($repair_statut==0) return img_picto($langs->trans('StatusRepairWaitingEstimate'),'statut0').' '.$langs->trans('StatusRepairWaitingEstimateShort');
-            if ($repair_statut==1) return img_picto($langs->trans('StatusRepairEstimatesDuring'),'statut2@repair').' '.$langs->trans('StatusRepairEstimatesDuringShort');
-            if ($repair_statut==2) return img_picto($langs->trans('StatusRepairEstimatesComplete'),'statut2@repair').' '.$langs->trans('StatusRepairEstimatesCompleteShort');
-            if ($repair_statut==3) return img_picto($langs->trans('StatusRepairEstimatesValidate'),'statut2@repair').' '.$langs->trans('StatusRepairEstimatesValidateShort');
-            if ($repair_statut==4) return img_picto($langs->trans('StatusRepairAcceptedEstimate'),'statut1').' '.$langs->trans('StatusRepairAcceptedEstimateShort');
-            if ($repair_statut==5) return img_picto($langs->trans('StatusRepairInProgress'),'statut3').' '.$langs->trans('StatusRepairInProgressShort');
-            if ($repair_statut==6) return img_picto($langs->trans('StatusRepairComplete'),'statut4').' '.$langs->trans('StatusRepairCompleteShort');
-            if ($repair_statut==7) return img_picto($langs->trans('StatusRepairValidate'),'statut4').' '.$langs->trans('StatusRepairValidateShort');
-            if ($repair_statut==8 && ! $facturee) return img_picto($langs->trans('StatusRepairToBill'),'statut7').' '.$langs->trans('StatusRepairToBillShort');
-            if ($repair_statut==8 && $facturee) return img_picto($langs->trans('StatusRepairProcessed'),'statut6').' '.$langs->trans('StatusRepairProcessedShort');
-        }
-        elseif ($mode == 3) //Picto
-        {
-            if ($repair_statut==-2) return img_picto($langs->trans('StatusRepairRefusedEstimate'),'statut5');
-            if ($repair_statut==-1) return img_picto($langs->trans('StatusRepairCanceled'),'statut5');
-            if ($repair_statut==0) return img_picto($langs->trans('StatusRepairWaitingEstimate'),'statut0');
-            if ($repair_statut==1) return img_picto($langs->trans('StatusRepairEstimatesDuring'),'statut2@repair');
-            if ($repair_statut==2) return img_picto($langs->trans('StatusRepairEstimatesComplete'),'statut2@repair');
-            if ($repair_statut==3) return img_picto($langs->trans('StatusRepairEstimatesValidate'),'statut2@repair');
-            if ($repair_statut==4) return img_picto($langs->trans('StatusRepairAcceptedEstimate'),'statut1');
-            if ($repair_statut==5) return img_picto($langs->trans('StatusRepairInProgress'),'statut3');
-            if ($repair_statut==6) return img_picto($langs->trans('StatusRepairComplete'),'statut4');
-            if ($repair_statut==7) return img_picto($langs->trans('StatusRepairValidate'),'statut4');
-            if ($repair_statut==8 && ! $facturee) return img_picto($langs->trans('StatusRepairToBill'),'statut7');
-            if ($repair_statut==8 && $facturee) return img_picto($langs->trans('StatusRepairProcessed'),'statut6');
-        }
-        elseif ($mode == 4) //Picto + Libelle long
-        {
-            if ($repair_statut==-2) return img_picto($langs->trans('StatusRepairRefusedEstimate'),'statut5').' '.$langs->trans('StatusRepairRefusedEstimate');
-            if ($repair_statut==-1) return img_picto($langs->trans('StatusRepairCanceled'),'statut5').' '.$langs->trans('StatusRepairCanceled');
-            if ($repair_statut==0) return img_picto($langs->trans('StatusRepairWaitingEstimate'),'statut0').' '.$langs->trans('StatusRepairWaitingEstimate');
-            if ($repair_statut==1) return img_picto($langs->trans('StatusRepairEstimatesDuring'),'statut2@repair').' '.$langs->trans('StatusRepairEstimatesDuring');
-            if ($repair_statut==2) return img_picto($langs->trans('StatusRepairEstimatesComplete'),'statut2@repair').' '.$langs->trans('StatusRepairEstimatesComplete');
-            if ($repair_statut==3) return img_picto($langs->trans('StatusRepairEstimatesValidate'),'statut2@repair').' '.$langs->trans('StatusRepairEstimatesValidate');
-            if ($repair_statut==4) return img_picto($langs->trans('StatusRepairAcceptedEstimate'),'statut1').' '.$langs->trans('StatusRepairAcceptedEstimate');
-            if ($repair_statut==5) return img_picto($langs->trans('StatusRepairInProgress'),'statut3').' '.$langs->trans('StatusRepairInProgress');
-            if ($repair_statut==6) return img_picto($langs->trans('StatusRepairComplete'),'statut4').' '.$langs->trans('StatusRepairComplete');
-            if ($repair_statut==7) return img_picto($langs->trans('StatusRepairValidate'),'statut4').' '.$langs->trans('StatusRepairValidate');
-            if ($repair_statut==8 && ! $facturee) return img_picto($langs->trans('StatusRepairToBill'),'statut7').' '.$langs->trans('StatusRepairToBill');
-            if ($repair_statut==8 && $facturee) return img_picto($langs->trans('StatusRepairProcessed'),'statut6').' '.$langs->trans('StatusRepairProcessed');
-        }
-        elseif ($mode == 5) //Libelle court + Picto
-        {
-            if ($repair_statut==-2) return $langs->trans('StatusRepairRefusedEstimateShort').' '.img_picto($langs->trans('StatusRepairRefusedEstimate'),'statut5');
-            if ($repair_statut==-1) return $langs->trans('StatusRepairCanceledShort').' '.img_picto($langs->trans('StatusRepairCanceled'),'statut5');
-            if ($repair_statut==0) return $langs->trans('StatusRepairWaitingEstimateShort').' '.img_picto($langs->trans('StatusRepairWaitingEstimate'),'statut0');
-            if ($repair_statut==1) return $langs->trans('StatusRepairEstimatesDuringShort').' '.img_picto($langs->trans('StatusRepairEstimatesDuring'),'statut2@repair');
-            if ($repair_statut==2) return $langs->trans('StatusRepairEstimatesCompleteShort').' '.img_picto($langs->trans('StatusRepairEstimatesComplete'),'statut2@repair');
-            if ($repair_statut==3) return $langs->trans('StatusRepairEstimatesValidateShort').' '.img_picto($langs->trans('StatusRepairEstimatesValidate'),'statut2@repair');
-            if ($repair_statut==4) return $langs->trans('StatusRepairAcceptedEstimateShort').' '.img_picto($langs->trans('StatusRepairAcceptedEstimate'),'statut1');
-            if ($repair_statut==5) return $langs->trans('StatusRepairInProgressShort').' '.img_picto($langs->trans('StatusRepairInProgress'),'statut3');
-            if ($repair_statut==6) return $langs->trans('StatusRepairCompleteShort').' '.img_picto($langs->trans('StatusRepairComplete'),'statut4');
-            if ($repair_statut==7) return $langs->trans('StatusRepairValidate').' '.img_picto($langs->trans('StatusRepairValidate'),'statut4');
-            if ($repair_statut==8 && ! $facturee) return $langs->trans('StatusRepairToBillShort').' '.img_picto($langs->trans('StatusRepairToBill'),'statut7');
-            if ($repair_statut==8 && $facturee) return $langs->trans('StatusRepairProcessedShort').' '.img_picto($langs->trans('StatusRepairProcessed'),'statut6');
-        }
-    }
-
-
-    /**
-     *	Return clicable link of object (with eventually picto)
-     *
-     *	@param      int			$withpicto      Add picto into link
-     *	@param      int			$option         Where point the link
-     *	@param      int			$max          	Max length to show
-     *	@param      int			$short			Use short labels
-     *	@return     string          		String with URL
-     */
-    function getNomUrl($withpicto=0,$option=0,$max=0,$short=0)
-    {
-        global $conf, $langs;
-
-        $result='';
-
-/*        if ($conf->expedition->enabled && ($option == 1 || $option == 2)) $url = DOL_URL_ROOT.'/expedition/shipment.php?id='.$this->id;
-        else*/ $url = DOL_URL_ROOT.'/repair/fiche.php?id='.$this->id;
-
-        if ($short) return $url;
-
-        $linkstart = '<a href="'.$url.'">';
-        $linkend='</a>';
-
-        $picto='repair@repair';
-        $label=$langs->trans("ShowRepair").': '.$this->ref;
-
-        if ($withpicto) $result.=($linkstart.img_object($label,$picto).$linkend);
-        if ($withpicto && $withpicto != 2) $result.=' ';
-        $result.=$linkstart.$this->ref.$linkend;
-        return $result;
-    }
-
-
-    /**
-     *	Charge les informations d'ordre info dans l'objet repair
-     *
-     *	@param  int		$id       Id of order
-     *	@return	void
-     */
-    function info($id)
-    {
-        $sql = 'SELECT c.rowid, date_creation as datec, tms as datem,';
-        $sql.= ' date_valid_e as datev_e,';
-        $sql.= ' date_valid_r as datev_r,';
-        $sql.= ' date_cloture as datecloture,';
-        $sql.= ' fk_user_author, fk_user_valid_e, fk_user_valid_r, fk_user_cloture';
-        $sql.= ' FROM '.MAIN_DB_PREFIX.'repair as c';
-        $sql.= ' WHERE c.rowid = '.$id;
-        $result=$this->db->query($sql);
-        if ($result)
-        {
-            if ($this->db->num_rows($result))
-            {
-                $obj = $this->db->fetch_object($result);
-                $this->id = $obj->rowid;
-                if ($obj->fk_user_author)
-                {
-                    $cuser = new User($this->db);
-                    $cuser->fetch($obj->fk_user_author);
-                    $this->user_creation   = $cuser;
-                }
-
-                if ($obj->fk_user_valid_e)
-                {
-                    $euser = new User($this->db);
-                    $euser->fetch($obj->fk_user_valid_e);
-                    $this->user_validation = $euser;
-                }
-
-                if ($obj->fk_user_valid_r)
-                {
-                    $ruser = new User($this->db);
-                    $ruser->fetch($obj->fk_user_valid_r);
-                    $this->user_approve = $ruser;
-                }
-
-                if ($obj->fk_user_cloture)
-                {
-                    $cluser = new User($this->db);
-                    $cluser->fetch($obj->fk_user_cloture);
-                    $this->user_cloture   = $cluser;
-                }
-
-                $this->date_creation     = $this->db->jdate($obj->datec);
-                $this->date_modification = $this->db->jdate($obj->datem);
-                $this->date_validation   = $this->db->jdate($obj->datev_e);
-                $this->date_approve   = $this->db->jdate($obj->datev_r);
-                $this->date_cloture      = $this->db->jdate($obj->datecloture);
-            }
-
-            $this->db->free($result);
-
-        }
-        else
-        {
-            dol_print_error($this->db);
-        }
-    }
-
-
-    /**
-     *  Initialise an instance with random values.
-     *  Used to build previews or test instances.
-     *	id must be 0 if object instance is a specimen.
-     *
-     *  @return	void
-     */
-    function initAsSpecimen()
-    {
-        global $user,$langs,$conf;
-
-        dol_syslog(get_class($this)."::initAsSpecimen");
-
-        // Charge tableau des produits prodids
-        $prodids = array();
-        $sql = "SELECT rowid";
-        $sql.= " FROM ".MAIN_DB_PREFIX."product";
-        $sql.= " WHERE entity IN (".getEntity('product', 1).")";
-        $resql = $this->db->query($sql);
-        if ($resql)
-        {
-            $num_prods = $this->db->num_rows($resql);
-            $i = 0;
-            while ($i < $num_prods)
-            {
-                $i++;
-                $row = $this->db->fetch_row($resql);
-                $prodids[$i] = $row[0];
-            }
-        }
-
-		$objmac = new Machine($this->db);
-		$objmac->initAsSpecimen();
-        // Initialise parametres
-        $this->id=0;
-        $this->ref = 'SPECIMEN';
-        $this->specimen=1;
-        $this->socid = 1;
-		$this->trademark = $objmac->trademark;
-		$this->model = $objmac->model;
-		$this->type_id = $objmac->type_id;
-		$this->n_model = $objmac->n_model;
-		$this->serial_num = $objmac->serial_num;
-		$this->breakdown = "ne fonctionne plus";
-		$this->support_id = "Mag";
-		$this->accessory = "cordon d'alimentation";
-        $this->date = time();
-        $this->date_lim_reglement=$this->date+3600*24*30;
-        $this->cond_reglement_code = 'RECEP';
-        $this->mode_reglement_code = 'CHQ';
-        $this->availability_code   = 'DSP';
-        $this->demand_reason_code  = 'SRC_00';
-        $this->note_public='This is a comment (public)';
-        $this->note='This is a comment (private)';
-        // Lines
-        $nbp = 5;
-        $xnbp = 0;
-        while ($xnbp < $nbp)
-        {
-            $line=new RepairLine($this->db);
-
-            $line->desc=$langs->trans("Description")." ".$xnbp;
-            $line->qty=1;
-            $line->subprice=100;
-            $line->price=100;
-            $line->tva_tx=19.6;
-            if ($xnbp == 2)
-            {
-                $line->total_ht=50;
-                $line->total_ttc=59.8;
-                $line->total_tva=9.8;
-                $line->remise_percent=50;
-            }
-            else
-            {
-                $line->total_ht=100;
-                $line->total_ttc=119.6;
-                $line->total_tva=19.6;
-                $line->remise_percent=00;
-            }
-            $prodid = rand(1, $num_prods);
-            $line->fk_product=$prodids[$prodid];
-
-            $this->lines[$xnbp]=$line;
-
-            $this->total_ht       += $line->total_ht;
-            $this->total_tva      += $line->total_tva;
-            $this->total_ttc      += $line->total_ttc;
-
-            $xnbp++;
-        }
-    }
-
-
-    /**
-     *	Charge indicateurs this->nb de tableau de bord
-     *
-     *	@return     int         <0 si ko, >0 si ok
-     */
-    function load_state_board()
-    {
-        global $conf, $user;
-
-        $this->nb=array();
-        $clause = "WHERE";
-
-        $sql = "SELECT count(co.rowid) as nb";
-        $sql.= " FROM ".MAIN_DB_PREFIX."repair as co";
-        $sql.= " LEFT JOIN ".MAIN_DB_PREFIX."societe as s ON co.fk_soc = s.rowid";
-        if (!$user->rights->societe->client->voir && !$user->societe_id)
-        {
-            $sql.= " LEFT JOIN ".MAIN_DB_PREFIX."societe_commerciaux as sc ON s.rowid = sc.fk_soc";
-            $sql.= " WHERE sc.fk_user = " .$user->id;
-            $clause = "AND";
-        }
-        $sql.= " ".$clause." co.entity = ".$conf->entity;
-
-        $resql=$this->db->query($sql);
-        if ($resql)
-        {
-            while ($obj=$this->db->fetch_object($resql))
-            {
-                $this->nb["orders"]=$obj->nb;
-            }
-            return 1;
-        }
-        else
-        {
-            dol_print_error($this->db);
-            $this->error=$this->db->error();
-            return -1;
-        }
-    }
-
-    /**
-     * 	Return an array of order lines
-     *
-     * @return	array		Lines of order
-     */
-    function getLinesArray()
-    {
-        $lines = array();
-
-        $sql = 'SELECT l.rowid, l.fk_product, l.product_type, l.label as custom_label, l.description, l.price, l.qty, l.tva_tx, ';
-        $sql.= ' l.fk_remise_except, l.remise_percent, l.subprice, l.info_bits, l.rang, l.special_code, l.fk_parent_line,';
-        $sql.= ' l.total_ht, l.total_tva, l.total_ttc, l.fk_product_fournisseur_price as fk_fournprice, l.buy_price_ht as pa_ht, l.localtax1_tx, l.localtax2_tx,';
-        $sql.= ' l.date_start, l.date_end,';
-        $sql.= ' p.label as product_label, p.ref, p.fk_product_type, p.rowid as prodid, ';
-        $sql.= ' p.description as product_desc, p.stock as stock_reel';
-        $sql.= ' FROM '.MAIN_DB_PREFIX.'repairdet as l';
-        $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'product as p ON l.fk_product=p.rowid';
-        $sql.= ' WHERE l.fk_repair = '.$this->id;
-        $sql.= ' ORDER BY l.rang ASC, l.rowid';
-
-        $resql = $this->db->query($sql);
-        if ($resql)
-        {
-            $num = $this->db->num_rows($resql);
-            $i = 0;
-
-            while ($i < $num)
-            {
-                $obj = $this->db->fetch_object($resql);
-
-                $this->lines[$i]->id				= $obj->rowid;
-                $this->lines[$i]->label 			= $obj->custom_label;
-                $this->lines[$i]->description 		= $obj->description;
-                $this->lines[$i]->fk_product		= $obj->fk_product;
-                $this->lines[$i]->ref				= $obj->ref;
-                $this->lines[$i]->product_label		= $obj->product_label;
-                $this->lines[$i]->product_desc		= $obj->product_desc;
-                $this->lines[$i]->fk_product_type	= $obj->fk_product_type;
-                $this->lines[$i]->product_type		= $obj->product_type;
-                $this->lines[$i]->qty				= $obj->qty;
-                $this->lines[$i]->subprice			= $obj->subprice;
-                $this->lines[$i]->fk_remise_except 	= $obj->fk_remise_except;
-                $this->lines[$i]->remise_percent	= $obj->remise_percent;
-                $this->lines[$i]->tva_tx			= $obj->tva_tx;
-                $this->lines[$i]->info_bits			= $obj->info_bits;
-                $this->lines[$i]->total_ht			= $obj->total_ht;
-                $this->lines[$i]->total_tva			= $obj->total_tva;
-                $this->lines[$i]->total_ttc			= $obj->total_ttc;
-                $this->lines[$i]->fk_parent_line	= $obj->fk_parent_line;
-                $this->lines[$i]->special_code		= $obj->special_code;
-				$this->lines[$i]->stock				= $obj->stock_reel;
-                $this->lines[$i]->rang				= $obj->rang;
-                $this->lines[$i]->date_start		= $this->db->jdate($obj->date_start);
-                $this->lines[$i]->date_end			= $this->db->jdate($obj->date_end);
-				$this->lines[$i]->fk_fournprice		= $obj->fk_fournprice;
-				$marginInfos						= getMarginInfos($obj->subprice, $obj->remise_percent, $obj->tva_tx, $obj->localtax1_tx, $obj->localtax2_tx, $this->lines[$i]->fk_fournprice, $obj->pa_ht);
-				$this->lines[$i]->pa_ht				= $marginInfos[0];
-				$this->lines[$i]->marge_tx			= $marginInfos[1];
-				$this->lines[$i]->marque_tx			= $marginInfos[2];
-
-                $i++;
-            }
-
-            $this->db->free($resql);
-
-            return 1;
-        }
-        else
-        {
-            $this->error=$this->db->error();
-            dol_syslog("Error sql=$sql, error=".$this->error,LOG_ERR);
-            return -1;
-        }
-    }
 
 	/**
      *	Get fk_machine
@@ -4066,7 +3859,7 @@ class RepairLine
     var $price;
 
     // From llx_product
-    var $ref;				// Reference produit
+    var $ref;				// deprecated
     var $libelle;			// deprecated
     var $product_ref;
     var $product_label; 	// Label produit
@@ -4085,7 +3878,7 @@ class RepairLine
      *
      *      @param     DoliDB	$DB      handler d'acces base de donnee
      */
-    function RepairLine($DB)
+    function __construct($DB)
     {
         $this->db= $DB;
     }
@@ -4175,7 +3968,7 @@ class RepairLine
         if ($resql)
         {
             // Appel des triggers
-            include_once(DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php");
+            include_once DOL_DOCUMENT_ROOT . '/core/class/interfaces.class.php';
             $interface=new Interfaces($this->db);
             $result=$interface->run_triggers('LINEORDER_DELETE',$this,$user,$langs,$conf);
             if ($result < 0) { $error++; $this->errors=$interface->errors; }
