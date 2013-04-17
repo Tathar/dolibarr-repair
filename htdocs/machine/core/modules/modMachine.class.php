@@ -267,7 +267,7 @@ class modMachine extends DolibarrModules
 //
 		$this->menu[$r]=array('fk_menu'=>'r=4',
 													'type'=>'left',
-													'titre'=>'StatusRepairValidated',
+													'titre'=>'StatusRepairCompleted',
 													'mainmenu'=>'machine',
 													'url'=>'/repair/liste.php?leftmenu=repair&viewstatut=2',
 													'langs'=>'repair@repair',
@@ -280,7 +280,7 @@ class modMachine extends DolibarrModules
 
 		$this->menu[$r]=array('fk_menu'=>'r=4',
 													'type'=>'left',
-													'titre'=>'StatusRepairSentShort',
+													'titre'=>'StatusRepairValidated',
 													'mainmenu'=>'machine',
 													'url'=>'/repair/liste.php?leftmenu=repair&viewstatut=3',
 													'langs'=>'repair@repair',

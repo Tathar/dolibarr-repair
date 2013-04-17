@@ -64,7 +64,7 @@ class Repair extends CommonOrder
 	var $support_id;
 //TODO fk_machine_lend 
 	var $accessory;
-	var $statut;		// -1=Canceled, 0=Draft, 1=Validated, (2=Accepted/On process not managed for customer orders), 3=Closed (Sent/Received, billed or not)
+	var $statut;		// -1=Canceled, 0=Draft, 1=finished, 2=Validated, 3=Closed (Sent/Received, billed or not)
 	var $on_process;		// 0=Waiting, 1=On process
 
     var $facturee;		// Facturee ou non
@@ -2563,7 +2563,7 @@ class Repair extends CommonOrder
      *	@param      int		$mode        	0=libelle long, 1=libelle court, 2=Picto + Libelle court, 3=Picto, 4=Picto + Libelle long, 5=Libelle court + Picto
      *  @return     string					Label of status
      */
-    function LibStatut($statut,$facturee,$mode)
+    function LibStatut($statut,$on_process,$facturee,$mode)
     {
         global $langs;
         //print 'x'.$statut.'-'.$facturee;
@@ -2572,8 +2572,8 @@ class Repair extends CommonOrder
             if ($statut==-1) return $langs->trans('StatusRepairCanceled');
             if ($statut==0 && $on_process == 0) return $langs->trans('StatusRepairDraft');
             if ($statut==0 && $on_process == 1) return $langs->trans('StatusRepairOnProcess');
-            if ($statut==1) return $langs->trans('StatusRepairValidated');
-            if ($statut==2) return $langs->trans('StatusRepairSentShort');
+            if ($statut==1) return $langs->trans('StatusRepairCompleted');
+            if ($statut==2) return $langs->trans('StatusRepairValidated');
             if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairToBill');
             if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairProcessed');
         
@@ -2583,8 +2583,8 @@ class Repair extends CommonOrder
 			if ($statut==-1) return $langs->trans('StatusRepairCanceledShort');
             if ($statut==0 && $on_process == 0) return $langs->trans('StatusRepairDraftShort');
             if ($statut==0 && $on_process == 1) return $langs->trans('StatusRepairOnProcessShort');
-            if ($statut==1) return $langs->trans('StatusRepairValidatedShort');
-            if ($statut==2) return $langs->trans('StatusRepairSentShort');
+            if ($statut==1) return $langs->trans('StatusRepairCompletedShort');
+            if ($statut==2) return $langs->trans('StatusRepairValidatedShort');
             if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairToBillShort');
             if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairProcessed');
         }
@@ -2593,8 +2593,8 @@ class Repair extends CommonOrder
             if ($statut==-1) return img_picto($langs->trans('StatusRepairCanceled'),'statut5').' '.$langs->trans('StatusRepairCanceledShort');
             if ($statut==0 && $on_process == 0) return img_picto($langs->trans('StatusRepairDraft'),'statut0').' '.$langs->trans('StatusRepairDraftShort');
             if ($statut==0 && $on_process == 1) return img_picto($langs->trans('StatusRepairOnProcess'),'statut0').' '.$langs->trans('StatusRepairOnProcessShort');
-            if ($statut==1) return img_picto($langs->trans('StatusRepairValidated'),'statut1').' '.$langs->trans('StatusRepairValidatedShort');
-            if ($statut==2) return img_picto($langs->trans('StatusRepairSent'),'statut3').' '.$langs->trans('StatusRepairSentShort');
+            if ($statut==1) return img_picto($langs->trans('StatusRepairCompleted'),'statut1').' '.$langs->trans('StatusRepairCompletedShort');
+            if ($statut==2) return img_picto($langs->trans('StatusRepairValidated'),'statut3').' '.$langs->trans('StatusRepairValidatedShort');
             if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairToBill'),'statut7').' '.$langs->trans('StatusRepairToBillShort');
             if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairProcessed'),'statut6').' '.$langs->trans('StatusRepairProcessedShort');
         }
@@ -2603,8 +2603,8 @@ class Repair extends CommonOrder
             if ($statut==-1) return img_picto($langs->trans('StatusRepairCanceled'),'statut5');
             if ($statut==0 && $on_process == 0) return img_picto($langs->trans('StatusRepairDraft'),'statut0');
             if ($statut==0 && $on_process == 1) return img_picto($langs->trans('StatusRepairOnProcess'),'statut0');
-            if ($statut==1) return img_picto($langs->trans('StatusRepairValidated'),'statut1');
-            if ($statut==2) return img_picto($langs->trans('StatusRepairSentShort'),'statut3');
+            if ($statut==1) return img_picto($langs->trans('StatusRepairCompleted'),'statut1');
+            if ($statut==2) return img_picto($langs->trans('StatusRepairValidated'),'statut3');
             if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairToBill'),'statut7');
             if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairProcessed'),'statut6');
         }
@@ -2613,8 +2613,8 @@ class Repair extends CommonOrder
             if ($statut==-1) return img_picto($langs->trans('StatusRepairCanceled'),'statut5').' '.$langs->trans('StatusRepairCanceled');
             if ($statut==0 && $on_process == 0) return img_picto($langs->trans('StatusRepairDraft'),'statut0').' '.$langs->trans('StatusRepairDraft');
             if ($statut==0 && $on_process == 1) return img_picto($langs->trans('StatusRepairOnProcess'),'statut0').' '.$langs->trans('StatusRepairOnProcess');
-            if ($statut==1) return img_picto($langs->trans('StatusRepairValidated'),'statut1').' '.$langs->trans('StatusRepairValidated');
-            if ($statut==2) return img_picto($langs->trans('StatusRepairSentShort'),'statut3').' '.$langs->trans('StatusRepairSent');
+            if ($statut==1) return img_picto($langs->trans('StatusRepairCompletedShort'),'statut1').' '.$langs->trans('StatusRepairCompleted');
+            if ($statut==2) return img_picto($langs->trans('StatusRepairValidatedShort'),'statut3').' '.$langs->trans('StatusRepairValidated');
             if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairToBill'),'statut7').' '.$langs->trans('StatusRepairToBill');
             if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairProcessed'),'statut6').' '.$langs->trans('StatusRepairProcessed');
         }
@@ -2623,8 +2623,8 @@ class Repair extends CommonOrder
             if ($statut==-1) return $langs->trans('StatusRepairCanceledShort').' '.img_picto($langs->trans('StatusRepairCanceled'),'statut5');
             if ($statut==0 && $on_process == 0) return $langs->trans('StatusRepairDraftShort').' '.img_picto($langs->trans('StatusRepairDraft'),'statut0');
             if ($statut==0 && $on_process == 1) return $langs->trans('StatusRepairOnProcessShort').' '.img_picto($langs->trans('StatusRepairOnProcess'),'statut0');
-            if ($statut==1) return $langs->trans('StatusRepairValidatedShort').' '.img_picto($langs->trans('StatusRepairValidated'),'statut1');
-            if ($statut==2) return $langs->trans('StatusRepairSentShort').' '.img_picto($langs->trans('StatusRepairSent'),'statut3');
+            if ($statut==1) return $langs->trans('StatusRepairCompletedShort').' '.img_picto($langs->trans('StatusRepairCompleted'),'statut1');
+            if ($statut==2) return $langs->trans('StatusRepairValidatedShort').' '.img_picto($langs->trans('StatusRepairValidated'),'statut3');
             if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairToBillShort').' '.img_picto($langs->trans('StatusRepairToBill'),'statut7');
             if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairProcessedShort').' '.img_picto($langs->trans('StatusRepairProcessed'),'statut6');
         }

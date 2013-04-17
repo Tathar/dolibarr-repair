@@ -33,7 +33,7 @@ require_once(DOL_DOCUMENT_ROOT ."/repair/class/repair.class.php");
 $conf->repair->client->warning_delay=(isset($conf->global->MAIN_DELAY_REPAIRS_TO_PROCESS)?$conf->global->MAIN_DELAY_REPAIRS_TO_PROCESS:7)*24*60*60;
 
 //$langs->load('orders');
-$langs->load('repairlang@repair');
+$langs->load('repair@repair');
 $langs->load('deliveries');
 $langs->load('companies');
 
@@ -81,7 +81,7 @@ $companystatic = new Societe($db);
 llxHeader();
 
 $sql = 'SELECT s.nom, s.rowid as socid, s.client, c.rowid, c.ref, c.total_ht, c.ref_client,';
-$sql.= ' c.date_valid_e, c.date_valid_r, c.date_repair, c.date_livraison, c.fk_statut, c.repair_statut, c.facture as facturee,';
+$sql.= ' c.date_valid, c.date_valid, c.date_repair, c.date_livraison, c.fk_statut, c.on_process, c.facture as facturee,';
 $sql.= ' mm.model, mt.trademark';
 $sql.= ' FROM '.MAIN_DB_PREFIX.'societe as s';
 $sql.= ' LEFT JOIN '.MAIN_DB_PREFIX.'repair as c ON c.fk_soc = s.rowid';
@@ -103,17 +103,33 @@ if ($sall)
 }
 if ($viewstatut <> '')
 {
-	if ($viewstatut <= 8 && $viewstatut >= -2)
+	if ($viewstatut == -1 ) // annulee
 	{
-		$sql.= ' AND c.repair_statut ='.$viewstatut; // brouillon, validee, en cours, annulee
+		$sql.= ' AND c.fk_statut = -1'; 
 	}
-	if ($viewstatut == 8)
+	if ($viewstatut == 0 ) // brouillon
 	{
-		$sql.= ' AND c.facture = 0'; // need to create invoice
+		$sql.= ' AND c.fk_statut = 0 AND c.on_process = 0'; 
 	}
-	if ($viewstatut == 9)
+	if ($viewstatut == 1) // en cours
 	{
-		$sql.= ' AND c.repair_statut = 8 AND c.facture = 1'; // invoice created
+		$sql.= ' AND c.fk_statut = 0 AND c.on_process = 1'; 
+	}
+	if ($viewstatut == 2) // terminee
+	{
+		$sql.= ' AND c.fk_statut = 1'; 
+	}
+	if ($viewstatut == 3) // validee
+	{
+		$sql.= ' AND c.fk_statut = 2'; 
+	}
+	if ($viewstatut == 4) //a facturer
+	{
+		$sql.= ' AND c.fk_statut = 2 AND c.facture = 0'; // need to create invoice
+	}
+	if ($viewstatut == 5) // cloturee
+	{
+		$sql.= ' AND c.fk_statut = 3 AND c.facture = 1'; // invoice created
 	}
 /*	if ($viewstatut == -2)	// To process
 	{
@@ -174,13 +190,15 @@ if ($resql)
 	}
 	
 	if (strval($viewstatut) == '0')
-	$nameStats = ' - '.Repair::LibStatut($viewstatut, 0, 0);
-	if (($viewstatut >= -2 ) && ($viewstatut < 0))
-	$nameStats = ' - '.Repair::LibStatut($viewstatut, 0, 0);
-	if (($viewstatut > 0) && ($viewstatut <= 8))
-	$nameStats = ' - '.Repair::LibStatut($viewstatut, 0, 0);
-	if ($viewstatut == 9 )
-	$nameStats = ' - '.Repair::LibStatut(8, 1, 0);
+		$nameStats = ' - '.Repair::LibStatut(0, 0, 0, 0);
+	if ($viewstatut == 1 )
+		$nameStats = ' - '.Repair::LibStatut(0, 1, 0, 0);
+	if (($viewstatut >= 2 ) && ($viewstatut <= 4))
+		$nameStats = ' - '.Repair::LibStatut($viewstatut - 1, 0, 0, 0);
+	if ($viewstatut == 5 )
+		$nameStats = ' - '.Repair::LibStatut(3, 0, 1, 0);
+	if ($viewstatut == -1)
+		$nameStats = ' - '.Repair::LibStatut($viewstatut, 0, 0, 0);
 	$title.=$nameStats;
 
 	$num = $db->num_rows($resql);
@@ -243,7 +261,7 @@ if ($resql)
 		print '</td>';
 
 		print '<td width="20" class="nobordernopadding" nowrap="nowrap">';
-		if (/*($objp->fk_statut > 0) && ($objp->fk_statut < 3) && */$db->jdate($objp->date_repair) < ($now - $conf->repair->client->warning_delay)) print img_picto($langs->trans("Late"),"warning");
+		if (($objp->fk_statut >= 0) && ($objp->fk_statut < 3) && $db->jdate($objp->date_repair) < ($now - $conf->repair->client->warning_delay)) print img_picto($langs->trans("Late"),"warning");
 		print '</td>';
 
 		print '<td width="16" align="right" class="nobordernopadding">';
@@ -299,14 +317,8 @@ if ($resql)
 		print '</td>';
 
 		// Statut
-		if ($objp->repair_statut >= -2 && $objp->repair_statut <= 7)
-			$linkstatus = $objp->repair_statut;
-		if ($objp->repair_statut == 8 && $objp->facturee == 0)
-			$linkstatus = 8;
-		if ($objp->repair_statut == 8 && $objp->facturee == 1)
-			$linkstatus = 9;
 
-		print '<td align="right" nowrap="nowrap"><a href="'.$_SERVER['PHP_SELF'].'?viewstatut='.$linkstatus.'&sref='.$sref.'&orderyear='.$orderyear.'&ordermonth='.$ordermonth.'&deliveryyear='.$deliveryyear.'&deliverymonth='.$deliverymonth.'&snom='.$snom.'&sref_client='.$sref_client.'&trademark='.$trademark.'&model='.$model.'">'.$generic_repair->LibStatut($objp->repair_statut,$objp->facturee,5).'</a></td>';
+		print '<td align="right" nowrap="nowrap"><a href="'.$_SERVER['PHP_SELF'].'?viewstatut='.$linkstatus.'&sref='.$sref.'&orderyear='.$orderyear.'&ordermonth='.$ordermonth.'&deliveryyear='.$deliveryyear.'&deliverymonth='.$deliverymonth.'&snom='.$snom.'&sref_client='.$sref_client.'&trademark='.$trademark.'&model='.$model.'">'.$generic_repair->LibStatut($objp->fk_statut,$objp->on_process,$objp->facturee,5).'</a></td>';
 		print '</tr>';
 
 		$total = $total + $objp->price;
