@@ -36,6 +36,7 @@ if ($conf->facture->enabled) require_once(DOL_DOCUMENT_ROOT."/compta/facture/cla
 if ($conf->contrat->enabled) require_once(DOL_DOCUMENT_ROOT."/contrat/class/contrat.class.php");
 if ($conf->adherent->enabled) require_once(DOL_DOCUMENT_ROOT."/adherents/class/adherent.class.php");
 if ($conf->ficheinter->enabled) require_once(DOL_DOCUMENT_ROOT."/fichinter/class/fichinter.class.php");
+if ($conf->machine->enabled) require_once(DOL_DOCUMENT_ROOT ."/machine/class/machine.class.php");
 if ($conf->repair->enabled) require_once(DOL_DOCUMENT_ROOT ."/repair/class/repair.class.php");
 
 $langs->load("companies");
@@ -44,7 +45,8 @@ if ($conf->facture->enabled) $langs->load("bills");
 if ($conf->projet->enabled)  $langs->load("projects");
 if ($conf->ficheinter->enabled) $langs->load("interventions");
 if ($conf->notification->enabled) $langs->load("mails");
-//if ($conf->repair->enabled) $langs->load("repairlang@repair");
+if ($conf->machine->enabled) $langs->load("machine");
+if ($conf->repair->enabled) $langs->load("repair@repair");
 
 // Security check
 $id = (GETPOST('socid','int') ? GETPOST('socid','int') : GETPOST('id','int'));
@@ -169,7 +171,7 @@ if ($id > 0)
 
 	$head = societe_prepare_head($object);
 
-	dol_fiche_head($head, 'repair', $langs->trans("ThirdParty"),0,'company');
+	dol_fiche_head($head, 'machine', $langs->trans("ThirdParty"),0,'company');
 
 	print '<table width="100%" class="notopnoleftnoright">';
 	print '<tr><td valign="top" class="notopnoleft">';
@@ -582,7 +584,7 @@ if ($id > 0)
 	 */
 	print '<div class="tabsAction">';
 
-	if ($conf->repair->enabled && $user->rights->repair->creer)
+	if ($conf->repair->enabled && $user->rights->repair->create)
 	{
 		$langs->load("repairlang@repair");
 		print '<a class="butAction" href="'.DOL_URL_ROOT.'/repair/fiche.php?socid='.$object->id.'&amp;action=create">'.$langs->trans("AddRepair").'</a>';
