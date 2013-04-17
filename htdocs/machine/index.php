@@ -31,7 +31,7 @@ require_once(DOL_DOCUMENT_ROOT ."/repair/class/repair.class.php");
 
 if (!$user->rights->machine->read) accessforbidden();
 
-$langs->load("machine@machine");
+$langs->load("machine");
 
 // Security check
 $socid=GETPOST('socid','int');

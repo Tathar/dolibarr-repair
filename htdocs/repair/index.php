@@ -31,7 +31,7 @@ require_once(DOL_DOCUMENT_ROOT ."/repair/class/repair.class.php");
 
 if (!$user->rights->repair->lire) accessforbidden();
 
-$langs->load("repairlang@repair");
+$langs->load("repair@repair");
 
 // Security check
 $socid=GETPOST('socid','int');
