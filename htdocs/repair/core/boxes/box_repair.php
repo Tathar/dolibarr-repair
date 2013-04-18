@@ -71,7 +71,7 @@ class box_repair extends ModeleBoxes
 
         $this->info_box_head = array('text' => $langs->trans("BoxTitleLastCustomerRepair",$max));
 
-        if ($user->rights->repair->lire)
+        if ($user->rights->repair->read)
         {
 
             $sql = "SELECT s.nom, s.rowid as socid,";

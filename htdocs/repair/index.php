@@ -29,7 +29,7 @@ require_once(DOL_DOCUMENT_ROOT."/core/class/html.formfile.class.php");
 require_once(DOL_DOCUMENT_ROOT ."/core/class/notify.class.php");
 require_once(DOL_DOCUMENT_ROOT ."/repair/class/repair.class.php");
 
-if (!$user->rights->repair->lire) accessforbidden();
+if (!$user->rights->repair->read) accessforbidden();
 
 $langs->load("repair@repair");
 

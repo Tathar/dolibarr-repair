@@ -87,34 +87,20 @@ class modMachine extends DolibarrModules
 		$this->rights_class = 'machine';
 
 		$r=0;
-/*
-		$r++;
-		$this->rights[$r][0] = 12401;
-		$this->rights[$r][1] = 'Lire les machines';
-		$this->rights[$r][2] = 'r';
-		$this->rights[$r][3] = 1;
-		$this->rights[$r][4] = 'lire';
-*/
+
 		$r++;
 		$this->rights[$r][0] = 12401;
 		$this->rights[$r][1] = 'Lire les machines';
 		$this->rights[$r][2] = 'r';
 		$this->rights[$r][3] = 1;
 		$this->rights[$r][4] = 'read';
-/*
+
 		$r++;
 		$this->rights[$r][0] = 12402;
 		$this->rights[$r][1] = 'Créer les machines';
 		$this->rights[$r][2] = 'w';
 		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'creer';
-*/
-		$r++;
-		$this->rights[$r][0] = 12402;
-		$this->rights[$r][1] = 'Créer les machines';
-		$this->rights[$r][2] = 'w';
-		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'create';
+		$this->rights[$r][4] = 'write';
 
 		$r++;
 		$this->rights[$r][0] = 12408;
@@ -208,7 +194,7 @@ class modMachine extends DolibarrModules
 													'url'=>'/repair/index.php?leftmenu=repair',
 													'langs'=>'repair@repair',
 													'position'=>100,
-													'perms'=>'$user->rights->repair->lire',
+													'perms'=>'$user->rights->repair->read',
 													'enabled'=>'$conf->repair->enabled',
 													'target'=>'',
 													'user'=>2);
@@ -220,7 +206,7 @@ class modMachine extends DolibarrModules
 													'url'=>'/societe/societe.php?leftmenu=repair',
 													'langs'=>'societe',
 													'position'=>101,
-													'perms'=>'$user->rights->repair->lire',
+													'perms'=>'$user->rights->repair->read',
 													'enabled'=>'$conf->repair->enabled',
 													'target'=>'',
 													'user'=>2);
@@ -233,7 +219,7 @@ class modMachine extends DolibarrModules
 													'url'=>'/repair/liste.php?leftmenu=repair',
 													'langs'=>'repair@repair',
 													'position'=>102,
-													'perms'=>'$user->rights->repair->lire',
+													'perms'=>'$user->rights->repair->read',
 													'enabled'=>'$conf->repair->enabled',
 													'target'=>'',
 													'user'=>2);
@@ -246,7 +232,7 @@ class modMachine extends DolibarrModules
 													'url'=>'/repair/liste.php?leftmenu=repair&viewstatut=0',
 													'langs'=>'repair@repair',
 													'position'=>113,
-													'perms'=>'$user->rights->repair->lire',
+													'perms'=>'$user->rights->repair->read',
 													'enabled'=>'$conf->repair->enabled',
 													'target'=>'',
 													'user'=>2);
@@ -259,7 +245,7 @@ class modMachine extends DolibarrModules
 													'url'=>'/repair/liste.php?leftmenu=repair&viewstatut=1',
 													'langs'=>'repair@repair',
 													'position'=>114,
-													'perms'=>'$user->rights->repair->lire',
+													'perms'=>'$user->rights->repair->read',
 													'enabled'=>'$conf->repair->enabled',
 													'target'=>'',
 													'user'=>2);
@@ -272,7 +258,7 @@ class modMachine extends DolibarrModules
 													'url'=>'/repair/liste.php?leftmenu=repair&viewstatut=2',
 													'langs'=>'repair@repair',
 													'position'=>115,
-													'perms'=>'$user->rights->repair->lire',
+													'perms'=>'$user->rights->repair->read',
 													'enabled'=>'$conf->repair->enabled',
 													'target'=>'',
 													'user'=>2);
@@ -285,7 +271,7 @@ class modMachine extends DolibarrModules
 													'url'=>'/repair/liste.php?leftmenu=repair&viewstatut=3',
 													'langs'=>'repair@repair',
 													'position'=>116,
-													'perms'=>'$user->rights->repair->lire',
+													'perms'=>'$user->rights->repair->read',
 													'enabled'=>'$conf->repair->enabled',
 													'target'=>'',
 													'user'=>2);
@@ -298,7 +284,7 @@ class modMachine extends DolibarrModules
 													'url'=>'/repair/liste.php?leftmenu=repair&viewstatut=4',
 													'langs'=>'repair@repair',
 													'position'=>117,
-													'perms'=>'$user->rights->repair->lire',
+													'perms'=>'$user->rights->repair->read',
 													'enabled'=>'$conf->repair->enabled',
 													'target'=>'',
 													'user'=>2);
@@ -311,7 +297,7 @@ class modMachine extends DolibarrModules
 													'url'=>'/repair/liste.php?leftmenu=repair&viewstatut=5',
 													'langs'=>'repair@repair',
 													'position'=>118,
-													'perms'=>'$user->rights->repair->lire',
+													'perms'=>'$user->rights->repair->read',
 													'enabled'=>'$conf->repair->enabled',
 													'target'=>'',
 													'user'=>2);
@@ -324,7 +310,7 @@ class modMachine extends DolibarrModules
 													'url'=>'/repair/liste.php?leftmenu=repair&viewstatut=-1',
 													'langs'=>'repair@repair',
 													'position'=>121,
-													'perms'=>'$user->rights->repair->lire',
+													'perms'=>'$user->rights->repair->read',
 													'enabled'=>'$conf->repair->enabled',
 													'target'=>'',
 													'user'=>2);
@@ -337,7 +323,7 @@ class modMachine extends DolibarrModules
 													'url'=>'/repair/stats/index.php?leftmenu=repair',
 													'langs'=>'repair@repair',
 													'position'=>130,
-													'perms'=>'$user->rights->repair->lire',
+													'perms'=>'$user->rights->repair->read',
 													'enabled'=>'$conf->repair->enabled',
 													'target'=>'',
 													'user'=>2);

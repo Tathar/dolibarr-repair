@@ -28,7 +28,7 @@ require_once(DOL_DOCUMENT_ROOT."/core/lib/functions2.lib.php");
 require_once(DOL_DOCUMENT_ROOT."/repair/class/repair.class.php");
 require_once(DOL_DOCUMENT_ROOT."/repair/lib/repair.lib.php");
 
-if (!$user->rights->repair->lire)	accessforbidden();
+if (!$user->rights->repair->read)	accessforbidden();
 
 //$langs->load("repairlang@repair");
 $langs->load("sendings");

@@ -402,7 +402,7 @@ if ($id > 0)
 	/*
 	 * Last repairs
 	 */
-	if ($conf->repair->enabled && $user->rights->repair->lire)
+	if ($conf->repair->enabled && $user->rights->repair->read)
 	{
 		$repair_static=new Repair($db);
 
@@ -582,7 +582,7 @@ if ($id > 0)
 	 */
 	print '<div class="tabsAction">';
 
-	if ($conf->repair->enabled && $user->rights->repair->creer)
+	if ($conf->repair->enabled && $user->rights->repair->write)
 	{
 		$langs->load("repairlang@repair");
 		print '<a class="butAction" href="'.DOL_URL_ROOT.'/repair/fiche.php?socid='.$object->id.'&amp;action=create">'.$langs->trans("AddRepair").'</a>';

@@ -34,7 +34,7 @@ $WIDTH=500;
 $HEIGHT=200;
 
 $mode=GETPOST("mode")?GETPOST("mode"):'customer';
-if ($mode == 'customer' && ! $user->rights->repair->lire) accessforbidden();
+if ($mode == 'customer' && ! $user->rights->repair->read) accessforbidden();
 if ($mode == 'supplier' && ! $user->rights->fournisseur->repair->lire) accessforbidden();
 
 $userid=GETPOST('userid','int'); if ($userid < 0) $userid=0;

@@ -41,7 +41,7 @@ function repair_prepare_head($object)
 	$h = 0;
 	$head = array();
 
-	if (! empty($conf->repair->enabled) && $user->rights->repair->lire)
+	if (! empty($conf->repair->enabled) && $user->rights->repair->read)
 	{
 		$head[$h][0] = DOL_URL_ROOT.'/repair/fiche.php?id='.$object->id;
 		$head[$h][1] = $langs->trans("RepairCard");
