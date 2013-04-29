@@ -9,7 +9,7 @@
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU  *General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
@@ -183,9 +183,9 @@ class Repair extends CommonOrder
     /**
      *	Validate Repair
      *
-     *	@param	User	$user			Object user that modify
-     *	@param	int		$idwarehouse	Id warehouse to use for stock change.
-     *	@return	int						<0 if KO, >0 if OK
+     *	@param		User	$user     		User making status change
+     *	@param		int		$idwarehouse	Id of warehouse to use for stock decrease
+     *	@return  	int						<=0 if OK, >0 if KO
      */
     function valid($user, $idwarehouse=0)
     {
@@ -197,18 +197,18 @@ class Repair extends CommonOrder
         // Protection
         if ($this->statut == 1)
         {
-			dol_syslog(get_class($this)."::valid no draft status", LOG_WARNING);
+            dol_syslog(get_class($this)."::valid no draft status", LOG_WARNING);
             return 0;
         }
 
-        if (! $user->rights->repair->ValidateRepair)
+        if (! $user->rights->repair->Validate)
         {
             $this->error='Permission denied';
             dol_syslog(get_class($this)."::valid ".$this->error, LOG_ERR);
             return -1;
         }
 
-		$now=dol_now();
+        $now=dol_now();
 
         $this->db->begin();
 
@@ -239,10 +239,10 @@ class Repair extends CommonOrder
         $sql.= " WHERE rowid = ".$this->id;
 
         dol_syslog(get_class($this)."::valid() sql=".$sql);
-		$resql=$this->db->query($sql);
-		if (! $resql)
+        $resql=$this->db->query($sql);
+        if (! $resql)
         {
-            dol_syslog(get_class($this)."::valid() Echec update - 10 - sql=".$sql, LOG_ERR);
+            dol_syslog(get_class($this)."::valid Echec update - 10 - sql=".$sql, LOG_ERR);
             dol_print_error($this->db);
             $error++;
         }
@@ -348,7 +348,7 @@ class Repair extends CommonOrder
             return 0;
         }
 
-        if (! $user->rights->repair->valider)
+        if (! $user->rights->repair->Validate)
         {
             $this->error='Permission denied';
             return -1;
@@ -454,9 +454,9 @@ class Repair extends CommonOrder
 
         if (! $error)
         {
-            $this->statut = 1;
+        	$this->statut = 1;
         	$this->billed = 0;
-			$this->facturee = 0; // deprecated
+        	$this->facturee = 0; // deprecated
 
             $this->db->commit();
             return 1;
@@ -480,7 +480,7 @@ class Repair extends CommonOrder
 
         $error=0;
 
-        if ($user->rights->repair->cloturer)
+        if ($user->rights->repair->Validate)
         {
             $this->db->begin();
 
@@ -504,9 +504,9 @@ class Repair extends CommonOrder
 
                 if (! $error)
                 {
-            		$this->statut=3;
+                	$this->statut=3;
             		$this->on_process=0;
-            		$this->db->commit();
+                    $this->db->commit();
                     return 1;
                 }
                 else
@@ -533,24 +533,24 @@ class Repair extends CommonOrder
 
     /**
      *	Cancel Repair
+     * 	If stock is decremented on order validation, we must reincrement it
      *
-     *	@param	User	$user			Object user that modify
      *	@param	int		$idwarehouse	Id warehouse to use for stock change.
      *	@return	int						<0 if KO, >0 if OK
      */
-    function cancel($idwarehouse=-1)
-    {
-        global $conf,$user,$langs;
+	function cancel($idwarehouse=-1)
+	{
+		global $conf,$user,$langs;
 
-        $error=0;
+		$error=0;
 
-        if (! $user->rights->repair->MakeRepair)
+        if (! $user->rights->repair->Repair)
         {
             $this->error='Permission denied';
             return -1;
-        }
+		}
 
-        $this->db->begin();
+		$this->db->begin();
 
         $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
         $sql.= " SET fk_statut = -1,";
@@ -559,8 +559,8 @@ class Repair extends CommonOrder
 		$sql.= " AND fk_statut = 1";
 
         dol_syslog(get_class($this)."::cancel sql=".$sql, LOG_DEBUG);
-        if ($this->db->query($sql))
-        {
+		if ($this->db->query($sql))
+		{
 			// If stock is decremented on validate order, we must reincrement it
 			if (! empty($conf->stock->enabled) && $conf->global->STOCK_CALCULATE_ON_VALIDATE_ORDER == 1)
 			{
@@ -594,13 +594,13 @@ class Repair extends CommonOrder
 				// Fin appel triggers
 			}
 
-            if (! $error)
+			if (! $error)
 			{
 				$this->statut=-1;
             	$this->on_process=0;
-            	$this->db->commit();
-            	return 1;
-        	}
+				$this->db->commit();
+				return 1;
+			}
 			else
 			{
 				$this->error=$mouvP->error;
@@ -608,14 +608,14 @@ class Repair extends CommonOrder
 				return -1;
 			}
 		}
-        else
-        {
-            $this->error=$this->db->error();
-            $this->db->rollback();
-            dol_syslog($this->error, LOG_ERR);
-            return -1;
-        }
-    }
+		else
+		{
+			$this->error=$this->db->error();
+			$this->db->rollback();
+			dol_syslog($this->error, LOG_ERR);
+			return -1;
+		}
+	}
 
     /**
      *	Create repair
@@ -667,6 +667,7 @@ class Repair extends CommonOrder
 		}
 		$fk_machine = $result;
 //</Tathar>
+
         // $date_repair is deprecated
         $date = ($this->date_repair ? $this->date_repair : $this->date);
 
@@ -766,7 +767,7 @@ class Repair extends CommonOrder
 //<Tathar>
 				$this->date = $date;
 //</Tathar>
-				$sql = 'UPDATE '.MAIN_DB_PREFIX."repair SET ref='(PROV".$this->id.")' WHERE rowid=".$this->id;
+                $sql = 'UPDATE '.MAIN_DB_PREFIX."repair SET ref='(PROV".$this->id.")' WHERE rowid=".$this->id;
                 if ($this->db->query($sql))
                 {
                     if ($this->id)
@@ -816,7 +817,7 @@ class Repair extends CommonOrder
                     if (! $notrigger)
                     {
                         // Appel des triggers
-                        include_once DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php";
+                        include_once DOL_DOCUMENT_ROOT . '/core/class/interfaces.class.php';
                         $interface=new Interfaces($this->db);
                         $result=$interface->run_triggers('REPAIR_CREATE',$this,$user,$langs,$conf);
                         if ($result < 0) { $error++; $this->errors=$interface->errors; }
@@ -1062,11 +1063,11 @@ class Repair extends CommonOrder
      *	par l'appelant par la methode get_default_tva(societe_vendeuse,societe_acheteuse,produit)
      *	et le desc doit deja avoir la bonne valeur (a l'appelant de gerer le multilangue)
      */
-    function addline($repairid, $desc, $pu_ht, $qty, $txtva, $txlocaltax1=0, $txlocaltax2=0, $fk_product=0, $remise_percent=0, $info_bits=0, $fk_remise_except=0, $price_base_type='HT', $pu_ttc=0, $date_start='', $date_end='', $type=0, $rang=-1, $special_code=0, $fk_parent_line=0, $fk_fournprice=null, $pa_ht=0, $label='')
+	function addline($repairid, $desc, $pu_ht, $qty, $txtva, $txlocaltax1=0, $txlocaltax2=0, $fk_product=0, $remise_percent=0, $info_bits=0, $fk_remise_except=0, $price_base_type='HT', $pu_ttc=0, $date_start='', $date_end='', $type=0, $rang=-1, $special_code=0, $fk_parent_line=0, $fk_fournprice=null, $pa_ht=0, $label='')
     {
         dol_syslog(get_class($this)."::addline repairid=$repairid, desc=$desc, pu_ht=$pu_ht, qty=$qty, txtva=$txtva, fk_product=$fk_product, remise_percent=$remise_percent, info_bits=$info_bits, fk_remise_except=$fk_remise_except, price_base_type=$price_base_type, pu_ttc=$pu_ttc, date_start=$date_start, date_end=$date_end, type=$type", LOG_DEBUG);
 
-        include_once(DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php');
+        include_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
 
         // Clean parameters
         if (empty($remise_percent)) $remise_percent=0;
@@ -1175,7 +1176,7 @@ class Repair extends CommonOrder
                 // Reorder if child line
                 if (! empty($fk_parent_line)) $this->line_order(true,'DESC');
 
-                // Mise a jour informations denormalisees au niveau de la repair meme
+                // Mise a jour informations denormalisees au niveau de la reparation meme
                 $this->id=$repairid;	// TODO A virer
                 $result=$this->update_price(1);
                 if ($result > 0)
@@ -1255,7 +1256,7 @@ class Repair extends CommonOrder
 
             $this->lines[] = $line;
 
-            /** POUR AJOUTER AUTOMATIQUEMENT LES SOUSPRODUITS a LA REPAIR
+            /** POUR AJOUTER AUTOMATIQUEMENT LES SOUSPRODUITS a LA REPARATION
              if (! empty($conf->global->PRODUIT_SOUSPRODUITS))
              {
              $prod = new Product($this->db);
@@ -1324,58 +1325,57 @@ class Repair extends CommonOrder
             $obj = $this->db->fetch_object($result);
             if ($obj)
             {
-                $this->id                   = $obj->rowid;
-                $this->ref                  = $obj->ref;
-                $this->ref_client           = $obj->ref_client;
-                $this->ref_ext		  		= $obj->ref_ext;
+                $this->id					= $obj->rowid;
+                $this->ref					= $obj->ref;
+                $this->ref_client			= $obj->ref_client;
+                $this->ref_ext				= $obj->ref_ext;
                 $this->ref_int				= $obj->ref_int;
-                $this->socid                = $obj->fk_soc;
-                $this->statut               = $obj->fk_statut;
+                $this->socid				= $obj->fk_soc;
+                $this->statut				= $obj->fk_statut;
                 $this->on_process        	= $obj->on_process;
-                $this->user_author_id       = $obj->fk_user_author;
-                $this->total_ht             = $obj->total_ht;
-                $this->total_tva            = $obj->total_tva;
+                $this->user_author_id		= $obj->fk_user_author;
+                $this->total_ht				= $obj->total_ht;
+                $this->total_tva			= $obj->total_tva;
                 $this->total_localtax1		= $obj->total_localtax1;
                 $this->total_localtax2		= $obj->total_localtax2;
-                $this->total_ttc            = $obj->total_ttc;
-                $this->date                 = $this->db->jdate($obj->date_repair);
-                $this->date_repair          = $this->db->jdate($obj->date_repair);
-                $this->remise               = $obj->remise;
-                $this->remise_percent       = $obj->remise_percent;
-                $this->remise_absolue       = $obj->remise_absolue;
-                $this->source               = $obj->source;
+                $this->total_ttc			= $obj->total_ttc;
+                $this->date					= $this->db->jdate($obj->date_repair);
+                $this->date_repair			= $this->db->jdate($obj->date_repair);
+                $this->remise				= $obj->remise;
+                $this->remise_percent		= $obj->remise_percent;
+                $this->remise_absolue		= $obj->remise_absolue;
+                $this->source				= $obj->source;
                 $this->facturee				= $obj->billed;			// deprecated
                 $this->billed				= $obj->billed;
-                $this->note                 = $obj->note_private;	// deprecated
-                $this->note_private         = $obj->note_private;
-                $this->note_public          = $obj->note_public;
-                $this->breakdown            = $obj->breakdown;
-                $this->support_id           = $obj->support_id;
-                $this->accessory            = $obj->accessory;
-                $this->fk_project           = $obj->fk_projet;
-                $this->modelpdf             = $obj->model_pdf;
-                $this->mode_reglement_id    = $obj->fk_mode_reglement;
-                $this->mode_reglement_code  = $obj->mode_reglement_code;
-                $this->mode_reglement       = $obj->mode_reglement_libelle;
-                $this->cond_reglement_id    = $obj->fk_cond_reglement;
-                $this->cond_reglement_code  = $obj->cond_reglement_code;
-                $this->cond_reglement       = $obj->cond_reglement_libelle;
-                $this->cond_reglement_doc   = $obj->cond_reglement_libelle_doc;
+                $this->note					= $obj->note_private;	// deprecated
+                $this->note_private			= $obj->note_private;
+                $this->note_public			= $obj->note_public;
+                $this->breakdown			= $obj->breakdown;
+                $this->support_id			= $obj->support_id;
+                $this->accessory			= $obj->accessory;
+                $this->fk_project			= $obj->fk_projet;
+                $this->modelpdf				= $obj->model_pdf;
+                $this->mode_reglement_id	= $obj->fk_mode_reglement;
+                $this->mode_reglement_code	= $obj->mode_reglement_code;
+                $this->mode_reglement		= $obj->mode_reglement_libelle;
+                $this->cond_reglement_id	= $obj->fk_cond_reglement;
+                $this->cond_reglement_code	= $obj->cond_reglement_code;
+                $this->cond_reglement		= $obj->cond_reglement_libelle;
+                $this->cond_reglement_doc	= $obj->cond_reglement_libelle_doc;
                 $this->availability_id		= $obj->fk_availability;
-                $this->availability_code    = $obj->availability_code;
+                $this->availability_code	= $obj->availability_code;
                 $this->demand_reason_id		= $obj->fk_input_reason;
-                $this->demand_reason_code   = $obj->demand_reason_code;
-                $this->date_livraison       = $this->db->jdate($obj->date_livraison);
-                $this->fk_delivery_address  = $obj->fk_adresse_livraison;
+                $this->demand_reason_code	= $obj->demand_reason_code;
+                $this->date_livraison		= $this->db->jdate($obj->date_livraison);
+                $this->fk_delivery_address	= $obj->fk_adresse_livraison;
 
                 $this->extraparams			= (array) json_decode($obj->extraparams, true);
 
-                $fk_machine             	= $obj->fk_machine;
+                $fk_machine					= $obj->fk_machine;
 
-                $this->lines                = array();
+                $this->lines				= array();
 
                 if ($this->statut == 0) $this->brouillon = 1;
-
 
                 $this->db->free();
 
@@ -1535,7 +1535,7 @@ class Repair extends CommonOrder
                 $line->rowid            = $objp->rowid;				// \deprecated
                 $line->id               = $objp->rowid;
                 $line->fk_repair        = $objp->fk_repair;
-                $line->repair_id        = $objp->fk_repair;			// \deprecated
+                $line->repair_id      	= $objp->fk_repair;			// \deprecated
                 $line->label            = $objp->custom_label;
                 $line->desc             = $objp->description;  		// Description ligne
                 $line->product_type     = $objp->product_type;
@@ -2223,15 +2223,15 @@ class Repair extends CommonOrder
 		}
 	}
 
-    /**
-     *	Classify the order as invoiced
-     *
-     *	@return     int     <0 if ko, >0 if ok
-     */
-    function classer_facturee()
-    {
-        return $this->classifyBilled();
-    }
+	/**
+	 * Classify the order as invoiced
+	 *
+	 * @return     int     <0 if ko, >0 if ok
+	 */
+	function classer_facturee()
+	{
+		return $this->classifyBilled();
+	}
 
 
     /**
@@ -2250,19 +2250,19 @@ class Repair extends CommonOrder
      *  @param    	timestamp		$date_start        	Start date of the line
      *  @param    	timestamp		$date_end          	End date of the line
      * 	@param		int				$type				Type of line (0=product, 1=service)
-     *  @param		int				$fk_parent_line		Id of parent line (0 in most cases, used by modules adding sublevels into lines).
-     *  @param		int				$skip_update_total	Keep fields total_xxx to 0 (used for special lines by some modules)
+     * 	@param		int				$fk_parent_line		Id of parent line (0 in most cases, used by modules adding sublevels into lines).
+     * 	@param		int				$skip_update_total	Keep fields total_xxx to 0 (used for special lines by some modules)
      *  @param		int				$fk_fournprice		Id of origin supplier price
      *  @param		int				$pa_ht				Price (without tax) of product when it was bought
      *  @param		string			$label				Label
      *  @param		int				$special_code		Special code (also used by externals modules!)
      *  @return   	int              					< 0 if KO, > 0 if OK
      */
-    function updateline($rowid, $desc, $pu, $qty, $remise_percent, $txtva, $txlocaltax1=0,$txlocaltax2=0, $price_base_type='HT', $info_bits=0, $date_start='', $date_end='', $type=0, $fk_parent_line=0, $skip_update_total=0, $fk_fournprice=null, $pa_ht=0, $label='', $special_code=0)
+	function updateline($rowid, $desc, $pu, $qty, $remise_percent, $txtva, $txlocaltax1=0,$txlocaltax2=0, $price_base_type='HT', $info_bits=0, $date_start='', $date_end='', $type=0, $fk_parent_line=0, $skip_update_total=0, $fk_fournprice=null, $pa_ht=0, $label='', $special_code=0)
     {
         global $conf;
 
-        dol_syslog(get_class($this)."::Updateline $rowid, $desc, $pu, $qty, $remise_percent, $txtva, $txlocaltax1, $txlocaltax2, $price_base_type, $info_bits, $date_start, $date_end, $type");
+        dol_syslog(get_class($this)."::updateline $rowid, $desc, $pu, $qty, $remise_percent, $txtva, $txlocaltax1, $txlocaltax2, $price_base_type, $info_bits, $date_start, $date_end, $type");
         include_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';
 
         if (! empty($this->brouillon))
@@ -2572,7 +2572,7 @@ class Repair extends CommonOrder
             if ($statut==-1) return $langs->trans('StatusRepairCanceled');
             if ($statut==0 && $on_process == 0) return $langs->trans('StatusRepairDraft');
             if ($statut==0 && $on_process == 1) return $langs->trans('StatusRepairOnProcess');
-            if ($statut==1) return $langs->trans('StatusRepairCompleted');
+			if ($statut==1) return $langs->trans('StatusRepairCompleted');
             if ($statut==2) return $langs->trans('StatusRepairValidated');
             if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairToBill');
             if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairProcessed');
@@ -2635,10 +2635,10 @@ class Repair extends CommonOrder
      *	Return clicable link of object (with eventually picto)
      *
      *	@param      int			$withpicto      Add picto into link
-     *	@param      int			$option         Where point the link
+     *	@param      int			$option         Where point the link (0=> main card, 1,2 => shipment)
      *	@param      int			$max          	Max length to show
      *	@param      int			$short			Use short labels
-     *	@return     string          		String with URL
+     *	@return     string          			String with URL
      */
     function getNomUrl($withpicto=0,$option=0,$max=0,$short=0)
     {
@@ -2694,8 +2694,8 @@ class Repair extends CommonOrder
 
                 if ($obj->fk_user_valid)
                 {
-                    $euser = new User($this->db);
-                    $euser->fetch($obj->fk_user_valid);
+                    $vuser = new User($this->db);
+                    $vuser->fetch($obj->fk_user_valid);
                     $this->user_validation = $vuser;
                 }
 
@@ -2930,125 +2930,6 @@ class Repair extends CommonOrder
             return -1;
         }
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 //<Tathar>
 
@@ -3808,7 +3689,7 @@ class Repair extends CommonOrder
         if ($withpicto && $withpicto != 2) $result.=' ';
         $result.=$lien.($maxlen?dol_trunc($name,$maxlen):$name).$lienfin;
         return $result;
-    }
+	}
 
 }
 
@@ -3876,11 +3757,11 @@ class RepairLine
     /**
      *      Constructor
      *
-     *      @param     DoliDB	$DB      handler d'acces base de donnee
+     *      @param     DoliDB	$db      handler d'acces base de donnee
      */
-    function __construct($DB)
+    function __construct($db)
     {
-        $this->db= $DB;
+        $this->db= $db;
     }
 
     /**
@@ -4068,7 +3949,7 @@ class RepairLine
             if (! $notrigger)
             {
                 // Appel des triggers
-                include_once DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php";
+                include_once DOL_DOCUMENT_ROOT . '/core/class/interfaces.class.php';
                 $interface=new Interfaces($this->db);
                 $result=$interface->run_triggers('LINEORDER_INSERT',$this,$user,$langs,$conf);
                 if ($result < 0) { $error++; $this->errors=$interface->errors; }
@@ -4093,27 +3974,27 @@ class RepairLine
 	 *	@param      int		$notrigger		1 = disable triggers
      *	@return		int		<0 si ko, >0 si ok
      */
-    function update($notrigger=0)
-    {
-        global $conf,$langs,$user;
+	function update($notrigger=0)
+	{
+		global $conf,$langs,$user;
 
 		$error=0;
 
-        // Clean parameters
-        if (empty($this->tva_tx)) $this->tva_tx=0;
-        if (empty($this->localtax1_tx)) $this->localtax1_tx=0;
-        if (empty($this->localtax2_tx)) $this->localtax2_tx=0;
-        if (empty($this->qty)) $this->qty=0;
-        if (empty($this->total_localtax1)) $this->total_localtax1=0;
-        if (empty($this->total_localtax2)) $this->total_localtax2=0;
-        if (empty($this->marque_tx)) $this->marque_tx=0;
-        if (empty($this->marge_tx)) $this->marge_tx=0;
-        if (empty($this->remise)) $this->remise=0;
-        if (empty($this->remise_percent)) $this->remise_percent=0;
-        if (empty($this->info_bits)) $this->info_bits=0;
+		// Clean parameters
+		if (empty($this->tva_tx)) $this->tva_tx=0;
+		if (empty($this->localtax1_tx)) $this->localtax1_tx=0;
+		if (empty($this->localtax2_tx)) $this->localtax2_tx=0;
+		if (empty($this->qty)) $this->qty=0;
+		if (empty($this->total_localtax1)) $this->total_localtax1=0;
+		if (empty($this->total_localtax2)) $this->total_localtax2=0;
+		if (empty($this->marque_tx)) $this->marque_tx=0;
+		if (empty($this->marge_tx)) $this->marge_tx=0;
+		if (empty($this->remise)) $this->remise=0;
+		if (empty($this->remise_percent)) $this->remise_percent=0;
+		if (empty($this->info_bits)) $this->info_bits=0;
         if (empty($this->special_code)) $this->special_code=0;
-        if (empty($this->product_type)) $this->product_type=0;
-        if (empty($this->fk_parent_line)) $this->fk_parent_line=0;
+		if (empty($this->product_type)) $this->product_type=0;
+		if (empty($this->fk_parent_line)) $this->fk_parent_line=0;
 		if (empty($this->pa_ht)) $this->pa_ht=0;
 
 		// si prix d'achat non renseigné et utilisé pour calcul des marges alors prix achat = prix vente
@@ -4124,62 +4005,62 @@ class RepairLine
 
 		$this->db->begin();
 
-        // Mise a jour ligne en base
-        $sql = "UPDATE ".MAIN_DB_PREFIX."repairdet SET";
-        $sql.= " description='".$this->db->escape($this->desc)."'";
+		// Mise a jour ligne en base
+		$sql = "UPDATE ".MAIN_DB_PREFIX."repairdet SET";
+		$sql.= " description='".$this->db->escape($this->desc)."'";
 		$sql.= " , label=".(! empty($this->label)?"'".$this->db->escape($this->label)."'":"null");
-        $sql.= " , tva_tx=".price2num($this->tva_tx);
-        $sql.= " , localtax1_tx=".price2num($this->localtax1_tx);
-        $sql.= " , localtax2_tx=".price2num($this->localtax2_tx);
-        $sql.= " , qty=".price2num($this->qty);
-        $sql.= " , subprice=".price2num($this->subprice)."";
-        $sql.= " , remise_percent=".price2num($this->remise_percent)."";
-        $sql.= " , price=".price2num($this->price)."";					// TODO A virer
-        $sql.= " , remise=".price2num($this->remise)."";				// TODO A virer
-        if (empty($this->skip_update_total))
-        {
-            $sql.= " , total_ht=".price2num($this->total_ht)."";
-            $sql.= " , total_tva=".price2num($this->total_tva)."";
-            $sql.= " , total_ttc=".price2num($this->total_ttc)."";
+		$sql.= " , tva_tx=".price2num($this->tva_tx);
+		$sql.= " , localtax1_tx=".price2num($this->localtax1_tx);
+		$sql.= " , localtax2_tx=".price2num($this->localtax2_tx);
+		$sql.= " , qty=".price2num($this->qty);
+		$sql.= " , subprice=".price2num($this->subprice)."";
+		$sql.= " , remise_percent=".price2num($this->remise_percent)."";
+		$sql.= " , price=".price2num($this->price)."";					// TODO A virer
+		$sql.= " , remise=".price2num($this->remise)."";				// TODO A virer
+		if (empty($this->skip_update_total))
+		{
+			$sql.= " , total_ht=".price2num($this->total_ht)."";
+			$sql.= " , total_tva=".price2num($this->total_tva)."";
+			$sql.= " , total_ttc=".price2num($this->total_ttc)."";
 			$sql.= " , total_localtax1=".price2num($this->total_localtax1);
 			$sql.= " , total_localtax2=".price2num($this->total_localtax2);
-        }
+		}
 		$sql.= " , fk_product_fournisseur_price=".(! empty($this->fk_fournprice)?$this->fk_fournprice:"null");
 		$sql.= " , buy_price_ht='".price2num($this->pa_ht)."'";
-        $sql.= " , info_bits=".$this->info_bits;
+		$sql.= " , info_bits=".$this->info_bits;
         $sql.= " , special_code=".$this->special_code;
 		$sql.= " , date_start=".(! empty($this->date_start)?"'".$this->db->idate($this->date_start)."'":"null");
 		$sql.= " , date_end=".(! empty($this->date_end)?"'".$this->db->idate($this->date_end)."'":"null");
-        $sql.= " , product_type=".$this->product_type;
+		$sql.= " , product_type=".$this->product_type;
 		$sql.= " , fk_parent_line=".(! empty($this->fk_parent_line)?$this->fk_parent_line:"null");
-        if (! empty($this->rang)) $sql.= ", rang=".$this->rang;
-        $sql.= " WHERE rowid = ".$this->rowid;
+		if (! empty($this->rang)) $sql.= ", rang=".$this->rang;
+		$sql.= " WHERE rowid = ".$this->rowid;
 
-        dol_syslog(get_class($this)."::update sql=".$sql, LOG_DEBUG);
-        $resql=$this->db->query($sql);
-        if ($resql)
-        {
-            if (! $notrigger)
-            {
-                // Appel des triggers
-                include_once DOL_DOCUMENT_ROOT . "/core/class/interfaces.class.php";
-                $interface=new Interfaces($this->db);
-                $result = $interface->run_triggers('LINEORDER_UPDATE',$this,$user,$langs,$conf);
-                if ($result < 0) { $error++; $this->errors=$interface->errors; }
-                // Fin appel triggers
-            }
+		dol_syslog(get_class($this)."::update sql=".$sql, LOG_DEBUG);
+		$resql=$this->db->query($sql);
+		if ($resql)
+		{
+			if (! $notrigger)
+			{
+				// Appel des triggers
+				include_once DOL_DOCUMENT_ROOT . '/core/class/interfaces.class.php';
+				$interface=new Interfaces($this->db);
+				$result = $interface->run_triggers('LINEREPAIR_UPDATE',$this,$user,$langs,$conf);
+				if ($result < 0) { $error++; $this->errors=$interface->errors; }
+				// Fin appel triggers
+			}
 
-            $this->db->commit();
-            return 1;
-        }
-        else
-        {
-            $this->error=$this->db->error();
-            dol_syslog(get_class($this)."::update Error ".$this->error, LOG_ERR);
-            $this->db->rollback();
-            return -2;
-        }
-    }
+			$this->db->commit();
+			return 1;
+		}
+		else
+		{
+			$this->error=$this->db->error();
+			dol_syslog(get_class($this)."::update Error ".$this->error, LOG_ERR);
+			$this->db->rollback();
+			return -2;
+		}
+	}
 
     /**
      *	Update totals of order into database

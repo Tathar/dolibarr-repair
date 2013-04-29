@@ -133,7 +133,7 @@ class modRepair extends DolibarrModules
 
 		$r++;
 		$this->rights[$r][0] = 12501;
-		$this->rights[$r][1] = 'Lire les réparations';
+		$this->rights[$r][1] = 'Consulter les réparations';
 		$this->rights[$r][2] = 'r';
 		$this->rights[$r][3] = 1;
 		$this->rights[$r][4] = 'read';
@@ -141,39 +141,40 @@ class modRepair extends DolibarrModules
 
 		$r++;
 		$this->rights[$r][0] = 12502;
-		$this->rights[$r][1] = 'Créer les réparations';
+		$this->rights[$r][1] = 'Créer/modifier les réparations';
 		$this->rights[$r][2] = 'w';
 		$this->rights[$r][3] = 0;
 		$this->rights[$r][4] = 'write';
-
+/*
 		$r++;
 		$this->rights[$r][0] = 12504;
 		$this->rights[$r][1] = 'Valider les devis de réparations';
 		$this->rights[$r][2] = 'd';
 		$this->rights[$r][3] = 0;
 		$this->rights[$r][4] = 'ValidateEstimate';
-
+*/
+/*
 		$r++;
 		$this->rights[$r][0] = 12505;
 		$this->rights[$r][1] = 'Valider les réponses clients';
 		$this->rights[$r][2] = 'd';
 		$this->rights[$r][3] = 0;
 		$this->rights[$r][4] = 'ValidateReplies';
-
+*/
 		$r++;
 		$this->rights[$r][0] = 12506;
 		$this->rights[$r][1] = 'Effectuer les réparations';
 		$this->rights[$r][2] = 'w';
 		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'MakeRepair';
+		$this->rights[$r][4] = 'Repair';
 
 		$r++;
 		$this->rights[$r][0] = 12507;
 		$this->rights[$r][1] = 'Valider les réparations';
 		$this->rights[$r][2] = 'd';
 		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'ValidateRepair';
-
+		$this->rights[$r][4] = 'Validate';
+/*
 		$r++;
 		$this->rights[$r][0] = 12508;
 		$this->rights[$r][1] = 'Envoyer les réparations';
@@ -181,7 +182,7 @@ class modRepair extends DolibarrModules
 		$this->rights[$r][3] = 0;
 		$this->rights[$r][4] = 'repair_advance';
         $this->rights[$r][5] = 'send';
-
+*/
 		$r++;
 		$this->rights[$r][0] = 12509;
 		$this->rights[$r][1] = 'Cloturer les réparations';
