@@ -121,7 +121,7 @@ $parameters=array('socid'=>$socid);
 $reshook=$hookmanager->executeHooks('doActions',$parameters,$object,$action);    // Note that $action and $object may have been modified by some hooks
 
 // Action clone object
-if ($action == 'confirm_clone' && $confirm == 'yes' && $user->rights->repair->write)
+if ($action == 'confirm_clone' && $confirm == 'yes' && $user->rights->repair->creer)
 {
 	if (1==0 && ! GETPOST('clone_content') && ! GETPOST('clone_receivers'))
 	{
@@ -147,7 +147,7 @@ if ($action == 'confirm_clone' && $confirm == 'yes' && $user->rights->repair->wr
 }
 
 // Reopen a closed order
-else if ($action == 'reopen' && $user->rights->repair->write)
+else if ($action == 'reopen' && $user->rights->repair->creer)
 {
 	if ($object->statut == 3)
 	{
@@ -180,7 +180,7 @@ else if ($action == 'confirm_delete' && $confirm == 'yes' && $user->rights->repa
 }
 
 // Remove a product line
-else if ($action == 'confirm_deleteline' && $confirm == 'yes' && $user->rights->repair->write)
+else if ($action == 'confirm_deleteline' && $confirm == 'yes' && $user->rights->repair->creer)
 {
 	$result = $object->deleteline($lineid);
 	if ($result > 0)
@@ -211,7 +211,7 @@ else if ($action == 'confirm_deleteline' && $confirm == 'yes' && $user->rights->
 }
 
 // Categorisation dans projet
-else if ($action == 'classin' && $user->rights->repair->write)
+else if ($action == 'classin' && $user->rights->repair->creer)
 {
 	$object->setProject(GETPOST('projectid'));
 }
@@ -231,7 +231,7 @@ else if ($action == 'generatecard')
 }
 
 // Add order
-else if ($action == 'add' && $user->rights->repair->write)
+else if ($action == 'add' && $user->rights->repair->creer)
 {
 	$daterepair  = dol_mktime(12, 0, 0, GETPOST('remonth'),  GETPOST('reday'),  GETPOST('reyear'));
 	$datelivraison = dol_mktime(12, 0, 0, GETPOST('liv_month'),GETPOST('liv_day'),GETPOST('liv_year'));
@@ -466,23 +466,23 @@ else if ($action == 'add' && $user->rights->repair->write)
 	}
 }
 
-else if ($action == 'classifybilled' && $user->rights->repair>write)
+else if ($action == 'classifybilled' && $user->rights->repair>creer)
 {
 	$ret=$object->classifyBilled();
 }
 
 // Positionne ref reparation client
-else if ($action == 'set_ref_client' && $user->rights->repair->write)
+else if ($action == 'set_ref_client' && $user->rights->repair->creer)
 {
 	$object->set_ref_client($user, GETPOST('ref_client'));
 }
 
-else if ($action == 'setremise' && $user->rights->repair->write)
+else if ($action == 'setremise' && $user->rights->repair->creer)
 {
 	$object->set_remise($user, GETPOST('remise'));
 }
 
-else if ($action == 'setabsolutediscount' && $user->rights->repair->write)
+else if ($action == 'setabsolutediscount' && $user->rights->repair->creer)
 {
 	if (GETPOST('remise_id'))
 	{
@@ -497,7 +497,7 @@ else if ($action == 'setabsolutediscount' && $user->rights->repair->write)
 	}
 }
 
-else if ($action == 'setdate' && $user->rights->repair->write)
+else if ($action == 'setdate' && $user->rights->repair->creer)
 {
 	//print "x ".$_POST['liv_month'].", ".$_POST['liv_day'].", ".$_POST['liv_year'];
 	$date=dol_mktime(0, 0, 0, GETPOST('order_month'), GETPOST('order_day'), GETPOST('order_year'));
@@ -509,7 +509,7 @@ else if ($action == 'setdate' && $user->rights->repair->write)
 	}
 }
 
-else if ($action == 'setdate_livraison' && $user->rights->repair->write)
+else if ($action == 'setdate_livraison' && $user->rights->repair->creer)
 {
 	//print "x ".$_POST['liv_month'].", ".$_POST['liv_day'].", ".$_POST['liv_year'];
 	$datelivraison=dol_mktime(0, 0, 0, GETPOST('liv_month'), GETPOST('liv_day'), GETPOST('liv_year'));
@@ -521,25 +521,25 @@ else if ($action == 'setdate_livraison' && $user->rights->repair->write)
 	}
 }
 
-else if ($action == 'setmode' && $user->rights->repair->write)
+else if ($action == 'setmode' && $user->rights->repair->creer)
 {
 	$result = $object->setPaymentMethods(GETPOST('mode_reglement_id','int'));
 	if ($result < 0) dol_print_error($db,$object->error);
 }
 
-else if ($action == 'setavailability' && $user->rights->repair->write)
+else if ($action == 'setavailability' && $user->rights->repair->creer)
 {
 	$result=$object->availability(GETPOST('availability_id'));
 	if ($result < 0) dol_print_error($db,$object->error);
 }
 
-else if ($action == 'setdemandreason' && $user->rights->repair->write)
+else if ($action == 'setdemandreason' && $user->rights->repair->creer)
 {
 	$result=$object->demand_reason(GETPOST('demand_reason_id'));
 	if ($result < 0) dol_print_error($db,$object->error);
 }
 
-else if ($action == 'setconditions' && $user->rights->repair->write)
+else if ($action == 'setconditions' && $user->rights->repair->creer)
 {
 	$result=$object->setPaymentTerms(GETPOST('cond_reglement_id','int'));
 	if ($result < 0)
@@ -566,23 +566,23 @@ else if ($action == 'setconditions' && $user->rights->repair->write)
 	}
 }
 
-else if ($action == 'setremisepercent' && $user->rights->repair->write)
+else if ($action == 'setremisepercent' && $user->rights->repair->creer)
 {
 	$result = $object->set_remise($user, GETPOST('remise_percent'));
 }
 
-else if ($action == 'setremiseabsolue' && $user->rights->repair->write)
+else if ($action == 'setremiseabsolue' && $user->rights->repair->creer)
 {
 	$result = $object->set_remise_absolue($user, GETPOST('remise_absolue'));
 }
 
-else if ($action == 'setnote_public' && $user->rights->repair->write)
+else if ($action == 'setnote_public' && $user->rights->repair->creer)
 {
 	$result=$object->update_note_public(dol_html_entity_decode(GETPOST('note_public'), ENT_QUOTES));
 	if ($result < 0) dol_print_error($db,$object->error);
 }
 
-else if ($action == 'setnote' && $user->rights->repair->write)
+else if ($action == 'setnote' && $user->rights->repair->creer)
 {
 	$result=$object->update_note(dol_html_entity_decode(GETPOST('note'), ENT_QUOTES));
 	if ($result < 0) dol_print_error($db,$object->error);
@@ -591,7 +591,7 @@ else if ($action == 'setnote' && $user->rights->repair->write)
 /*
  *  Ajout d'une ligne produit dans la reparation
 */
-else if ($action == 'addline' && $user->rights->repair->write)
+else if ($action == 'addline' && $user->rights->repair->creer)
 {
 	$langs->load('errors');
 	$error = false;
@@ -832,7 +832,7 @@ else if ($action == 'addline' && $user->rights->repair->write)
 /*
  *  Mise a jour d'une ligne dans la reparation
 */
-else if ($action == 'updateligne' && $user->rights->repair->write && GETPOST('save') == $langs->trans('Save'))
+else if ($action == 'updateligne' && $user->rights->repair->creer && GETPOST('save') == $langs->trans('Save'))
 {
 	// Clean parameters
 	$date_start='';
@@ -951,7 +951,7 @@ else if ($action == 'updateligne' && $user->rights->repair->write && GETPOST('sa
 	}
 }
 
-else if ($action == 'updateligne' && $user->rights->repair->write && GETPOST('cancel') == $langs->trans('Cancel'))
+else if ($action == 'updateligne' && $user->rights->repair->creer && GETPOST('cancel') == $langs->trans('Cancel'))
 {
 	header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);   // Pour reaffichage de la fiche en cours d'edition
 	exit;
@@ -1038,7 +1038,7 @@ else if ($action == 'confirm_shipped' && $confirm == 'yes' && $user->rights->rep
 	if ($result < 0) $mesgs=$object->errors;
 }
 
-else if ($action == 'confirm_cancel' && $confirm == 'yes' && $user->rights->repair->write)
+else if ($action == 'confirm_cancel' && $confirm == 'yes' && $user->rights->repair->creer)
 {
 	$idwarehouse=GETPOST('idwarehouse');
 
@@ -1064,7 +1064,7 @@ else if ($action == 'confirm_cancel' && $confirm == 'yes' && $user->rights->repa
  * Ordonnancement des lignes
 */
 
-else if ($action == 'up' && $user->rights->repair->write)
+else if ($action == 'up' && $user->rights->repair->creer)
 {
 	$object->line_up(GETPOST('rowid'));
 
@@ -1085,7 +1085,7 @@ else if ($action == 'up' && $user->rights->repair->write)
 	exit;
 }
 
-else if ($action == 'down' && $user->rights->repair->write)
+else if ($action == 'down' && $user->rights->repair->creer)
 {
 	$object->line_down(GETPOST('rowid'));
 
@@ -1344,7 +1344,7 @@ if ($action == 'send' && ! GETPOST('addfile') && ! GETPOST('removedfile') && ! G
 			}
 	}
 
-	if (! empty($conf->global->MAIN_DISABLE_CONTACTS_TAB) && $user->rights->repair->write)
+	if (! empty($conf->global->MAIN_DISABLE_CONTACTS_TAB) && $user->rights->repair->creer)
 	{
 		if ($action == 'addcontact')
 		{
@@ -1412,62 +1412,62 @@ if ($action == 'send' && ! GETPOST('addfile') && ! GETPOST('removedfile') && ! G
 //<Tathar>
 
 // Positionne la prise en charge
-else if ($action == 'set_support_id' && $user->rights->repair->write)
+else if ($action == 'set_support_id' && $user->rights->repair->creer)
 {
     $object->set_support_id($user, $_POST['support_id']);
 	pdf_create_card();
 }
 
 // Positionne la marque de la machine
-else if ($action == 'set_trademark' && $user->rights->repair->write)
+else if ($action == 'set_trademark' && $user->rights->repair->creer)
 {
     $object->set_trademark($user, $_POST['trademark']);
 	pdf_create_card();
 }
 
 // Positionne le N° de modele de la machine
-else if ($action == 'set_n_model' && $user->rights->repair->write)
+else if ($action == 'set_n_model' && $user->rights->repair->creer)
 {
     $object->set_n_model($user, $_POST['n_model']);
 	pdf_create_card();
 }
 
 // Positionne le Type de la machine
-else if ($action == 'set_type' && $user->rights->repair->write)
+else if ($action == 'set_type' && $user->rights->repair->creer)
 {
     $object->set_type_id($user, $_POST['type_id']);
 	pdf_create_card();
 }
 
 // Positionne le Modele de la machine
-else if ($action == 'set_model' && $user->rights->repair->write)
+else if ($action == 'set_model' && $user->rights->repair->creer)
 {
     $object->set_model($user, $_POST['model']);
 	pdf_create_card();
 }
 
 // Positionne le N° de serie de la machine
-else if ($action == 'set_serial_num' && $user->rights->repair->write)
+else if ($action == 'set_serial_num' && $user->rights->repair->creer)
 {
     $object->set_serial_num($user, $_POST['serial_num']);
 	pdf_create_card();
 }
 
 // Positionne la panne de la machine
-else if ($action == 'set_breakdown' && $user->rights->repair->write)
+else if ($action == 'set_breakdown' && $user->rights->repair->creer)
 {
     $object->set_breakdown($user, $_POST['breakdown']);
 	pdf_create_card();
 }
 
 // Positionne les accessoires de la machine
-else if ($action == 'set_accessory' && $user->rights->repair->write)
+else if ($action == 'set_accessory' && $user->rights->repair->creer)
 {
     $object->set_accessory($user, $_POST['accessory']);
 	pdf_create_card();
 }
 
-else if ($action == 'createestimate' && $user->rights->repair->writeEstimate)
+else if ($action == 'createestimate' && $user->rights->repair->creerEstimate)
 {
 
     $object->fetch($id);	// Load order and lines
@@ -1490,9 +1490,10 @@ else if ($action == 'createestimate' && $user->rights->repair->writeEstimate)
         if (empty($conf->global->MAIN_DISABLE_PDF_AUTOUPDATE)) repair_pdf_create($db, $object, $object->modelpdf, $outputlangs, GETPOST('hidedetails'), GETPOST('hidedesc'), GETPOST('hideref'), $hookmanager);
     }
 */
+
 }
 
-else if ($action == 'finishestimate' && $user->rights->repair->writeEstimate)
+else if ($action == 'finishestimate' && $user->rights->repair->creerEstimate)
 {
 
     $object->fetch($id);	// Load order and lines
@@ -1502,7 +1503,7 @@ else if ($action == 'finishestimate' && $user->rights->repair->writeEstimate)
     if ($result < 0) $mesgs=$object->errors;
 }
 
-else if ($action == 'cancelestimate' && $user->rights->repair->writeEstimate)
+else if ($action == 'cancelestimate' && $user->rights->repair->creerEstimate)
 {
 
     $object->fetch($id);	// Load order and lines
@@ -1522,7 +1523,7 @@ else if ($action == 'validateestimate' && $user->rights->repair->ValidateEstimat
     if ($result < 0) $mesgs=$object->errors;
 }
 
-else if ($action == 'modifyestimate' && $user->rights->repair->writeEstimate)
+else if ($action == 'modifyestimate' && $user->rights->repair->creerEstimate)
 {
 
     $object->fetch($id);	// Load order and lines
@@ -1552,7 +1553,7 @@ else if ($action == 'refusedestimate' && $user->rights->repair->ValidateReplies)
     if ($result < 0) $mesgs=$object->errors;
 }
 
-else if ($action == 'unvalidestimate' && $user->rights->repair->writeEstimate)
+else if ($action == 'unvalidestimate' && $user->rights->repair->creerEstimate)
 {
 
     $object->fetch($id);	// Load order and lines
@@ -1562,17 +1563,28 @@ else if ($action == 'unvalidestimate' && $user->rights->repair->writeEstimate)
     if ($result < 0) $mesgs=$object->errors;
 }
 
-else if ($action == 'makerepair' && $user->rights->repair->writeEstimate)
+else if ($action == 'makerepair' && $user->rights->repair->Repair)
 {
-
-    $object->fetch($id);	// Load order and lines
-    $object->fetch_thirdparty();
-
     $result=$object->makeRepair($user);
     if ($result < 0) $mesgs=$object->errors;
 }
-else if ($action == 'unaccepteestimate' && $user->rights->repair->writeEstimate)
+
+else if ($action == 'pauserepair' && $user->rights->repair->Repair)
 {
+    $result=$object->pauseRepair($user);
+    if ($result < 0) $mesgs=$object->errors;
+}
+
+else if ($action == 'restartrepair' && $user->rights->repair->Repair)
+{
+    $result=$object->restartRepair($user);
+    if ($result < 0) $mesgs=$object->errors;
+}
+
+else if ($action == 'unaccepteestimate' && $user->rights->repair->creerEstimate)
+{
+    $object->fetch($id);	// Load order and lines
+    $object->fetch_thirdparty();
     $result=$object->unaccepteEstimate($user);
     if ($result < 0) $mesgs=$object->errors;
 }
@@ -1584,12 +1596,8 @@ else if ($action == 'unvalidrepair' && $user->rights->repair->MakeRepair)
 	if ($result < 0) $mesgs=$object->errors;
 }
 
-else if ($action == 'finishrepair' && $user->rights->repair->MakeRepair)
+else if ($action == 'confirm_finishrepair' && $user->rights->repair->Repair)
 {
-
-    $object->fetch($id);	// Load order and lines
-    $object->fetch_thirdparty();
-
     $result=$object->finishRepair($user);
     if ($result < 0) $mesgs=$object->errors;
 }
@@ -2160,6 +2168,14 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
 				$formconfirm=$form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id,$langs->trans('CloneRepair'),$langs->trans('ConfirmCloneRepair',$object->ref),'confirm_clone',$formquestion,'yes',1);
 			}
 
+			/*
+			 * Confirmation de fin de reparation
+			*/
+			if ($action == 'finishrepair')
+			{
+				$formconfirm=$form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id.'&lineid='.$lineid, $langs->trans('FinishRepair'), $langs->trans('FinishRepair'), 'confirm_finishrepair', '', 0, 1);
+			}
+
 			if (! $formconfirm)
 			{
 				$parameters=array('lineid'=>$lineid);
@@ -2198,7 +2214,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
 			if ($action != 'refcustomer' && $object->brouillon) print '<td align="right"><a href="'.$_SERVER['PHP_SELF'].'?action=refcustomer&amp;id='.$object->id.'">'.img_edit($langs->trans('Modify')).'</a></td>';
 			print '</tr></table>';
 			print '</td><td colspan="3">';
-			if ($user->rights->repair->write && $action == 'refcustomer')
+			if ($user->rights->repair->creer && $action == 'refcustomer')
 			{
 				print '<form action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'" method="post">';
 				print '<input type="hidden" name="token" value="'.$_SESSION['newtoken'].'">';
@@ -2224,7 +2240,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
             	if ($action != 'repairsupport' && $object->brouillon) print '<td align="right"><a href="'.$_SERVER['PHP_SELF'].'?action=repairsupport&amp;id='.$object->id.'">'.img_edit($langs->trans('Modify')).'</a></td>';
             	print '</tr></table>';
             	print '</td><td colspan="3">';
-            	if ($user->rights->repair->write && $action == 'repairsupport')
+            	if ($user->rights->repair->creer && $action == 'repairsupport')
             	{
 					$formrepair = new FormRepair($db);
             	    print '<form action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'" method="post">';
@@ -2255,7 +2271,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
             if ($action != 'trademark' && $object->brouillon) print '<td align="right"><a href="'.$_SERVER['PHP_SELF'].'?action=trademark&amp;id='.$object->id.'">'.img_edit($langs->trans('Modify')).'</a></td>';
             print '</tr></table>';
             print '</td><td colspan="3">';
-            if ($user->rights->repair->write && $action == 'trademark')
+            if ($user->rights->repair->creer && $action == 'trademark')
             {
                 print '<form action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'" method="post">';
                 print '<input type="hidden" name="token" value="'.$_SESSION['newtoken'].'">';
@@ -2279,7 +2295,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
             if ($action != 'n_model' && $object->brouillon) print '<td align="right"><a href="'.$_SERVER['PHP_SELF'].'?action=n_model&amp;id='.$object->id.'">'.img_edit($langs->trans('Modify')).'</a></td>';
             print '</tr></table>';
             print '</td><td colspan="3">';
-            if ($user->rights->repair->write && $action == 'n_model')
+            if ($user->rights->repair->creer && $action == 'n_model')
             {
                 print '<form action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'" method="post">';
                 print '<input type="hidden" name="token" value="'.$_SESSION['newtoken'].'">';
@@ -2303,7 +2319,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
             if ($action != 'model' && $object->brouillon) print '<td align="right"><a href="'.$_SERVER['PHP_SELF'].'?action=model&amp;id='.$object->id.'">'.img_edit($langs->trans('Modify')).'</a></td>';
             print '</tr></table>';
             print '</td><td colspan="3">';
-            if ($user->rights->repair->write && $action == 'model')
+            if ($user->rights->repair->creer && $action == 'model')
             {
                 print '<form action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'" method="post">';
                 print '<input type="hidden" name="token" value="'.$_SESSION['newtoken'].'">';
@@ -2332,7 +2348,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
             	if ($action != 'type' && $object->brouillon) print '<td align="right"><a href="'.$_SERVER['PHP_SELF'].'?action=type&amp;id='.$object->id.'">'.img_edit($langs->trans('Modify')).'</a></td>';
             	print '</tr></table>';
             	print '</td><td colspan="3">';
-            	if ($user->rights->repair->write && $action == 'type')
+            	if ($user->rights->repair->creer && $action == 'type')
             	{
             	    print '<form action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'" method="post">';
            	    	print '<input type="hidden" name="token" value="'.$_SESSION['newtoken'].'">';
@@ -2359,7 +2375,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
             if ($action != 'serial_num' && $object->brouillon) print '<td align="right"><a href="'.$_SERVER['PHP_SELF'].'?action=serial_num&amp;id='.$object->id.'">'.img_edit($langs->trans('Modify')).'</a></td>';
             print '</tr></table>';
             print '</td><td colspan="3">';
-            if ($user->rights->repair->write && $action == 'serial_num')
+            if ($user->rights->repair->creer && $action == 'serial_num')
             {
                 print '<form action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'" method="post">';
                 print '<input type="hidden" name="token" value="'.$_SESSION['newtoken'].'">';
@@ -2385,7 +2401,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
             if ($action != 'breakdown' && $object->brouillon) print '<td align="right"><a href="'.$_SERVER['PHP_SELF'].'?action=breakdown&amp;id='.$object->id.'">'.img_edit($langs->trans('Modify')).'</a></td>';
             print '</tr></table>';
             print '</td><td colspan="3">';
-            if ($user->rights->repair->write && $action == 'breakdown')
+            if ($user->rights->repair->creer && $action == 'breakdown')
             {
                 print '<form action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'" method="post">';
 				print '<table  width="100%" class="nobordernopadding"><tr><td nowrap="nowrap">';
@@ -2413,7 +2429,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
             if ($action != 'accessory' && $object->brouillon) print '<td align="right"><a href="'.$_SERVER['PHP_SELF'].'?action=accessory&amp;id='.$object->id.'">'.img_edit($langs->trans('Modify')).'</a></td>';
             print '</tr></table>';
             print '</td><td colspan="3">';
-            if ($user->rights->repair->write && $action == 'accessory')
+            if ($user->rights->repair->creer && $action == 'accessory')
             {
                 print '<form action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'" method="post">';
 				print '<table  width="100%" class="nobordernopadding"><tr><td nowrap="nowrap">';
@@ -2707,7 +2723,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
 			/*
 			 * Form to add new line
 			*/
-			if ($object->statut == 0 && $user->rights->repair->write)
+			if ($object->statut == 0 && $user->rights->repair->creer)
 			{
 				if ($action != 'editline')
 				{
@@ -2748,20 +2764,50 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
 				{
 					print '<div class="tabsAction">';
 
+					// Make Repair
+					if ($object->statut == 0 && $object->on_process == 0 && $user->rights->repair->creer)
+					{
+						print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&amp;action=makerepair">'.$langs->trans('MakeRepair').'</a>';
+					}
+
+					// Finish Repair
+					if ($object->statut == 0 && $object->on_process == 1 && $numlines > 0 && $user->rights->repair->creer)
+					{
+						print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&amp;action=finishrepair">'.$langs->trans('StartRepair').'</a>';
+					}
+
+					// Pause Repair
+					if ($object->statut == 0 && $object->on_process == 1 && $user->rights->repair->creer)
+					{
+						print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&amp;action=pauserepair">'.$langs->trans('PauseRepair').'</a>';
+					}
+
+					// Restart Repair
+					if ($object->statut == 0 && $object->on_process == 2 && $user->rights->repair->creer)
+					{
+						print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&amp;action=restartrepair">'.$langs->trans('RestartRepair').'</a>';
+					}
+
 					// Valid
-					if ($object->statut == 0 && $object->total_ttc >= 0 && $numlines > 0 && $user->rights->repair->write)
+					if ($object->statut == 1 && $object->on_process == 0 && $numlines > 0 && $user->rights->repair->Validate)
 					{
 						print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&amp;action=validate">'.$langs->trans('Validate').'</a>';
 					}
 
+					// Modify 
+					if ($object->statut == 1 && $object->on_process == 0 && $numlines > 0 && $user->rights->repair->Validate)
+					{
+						print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&amp;action=restartrepair">'.$langs->trans('Modify').'</a>';
+					}
+
 					// Edit
-					if ($object->statut == 1 && $user->rights->repair->write)
+					if ($object->statut == 1 && $object->on_process == 1 && $user->rights->repair->creer)
 					{
 						print '<a class="butAction" href="fiche.php?id='.$object->id.'&amp;action=modif">'.$langs->trans('Modify').'</a>';
 					}
 
 					// Send
-					if ($object->statut > 0)
+					if ($object->statut > 0 && $object->on_process == 1)
 					{
 						if ((empty($conf->global->MAIN_USE_ADVANCED_PERMS) || $user->rights->commande->order_advance->send))
 						{
@@ -2769,14 +2815,14 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
 						}
 						else print '<a class="butActionRefused" href="#">'.$langs->trans('SendByMail').'</a>';
 					}
-
+/*
 					// Ship
 					$numshipping=0;
 					if (! empty($conf->expedition->enabled))
 					{
 						$numshipping = $object->nb_expedition();
 
-						if ($object->statut > 0 && $object->statut < 3 && $object->getNbOfProductsLines() > 0)
+						if ($object->statut > 0 && $object->statut < 3 && $object->on_process == 1 && $object->getNbOfProductsLines() > 0)
 						{
 							if (($conf->expedition_bon->enabled && $user->rights->expedition->creer)
 									|| ($conf->livraison_bon->enabled && $user->rights->expedition->livraison->creer))
@@ -2797,7 +2843,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
 							}
 						}
 					}
-
+*/
                     // Create intervention
                     if ($conf->ficheinter->enabled)
                     {
@@ -2824,32 +2870,32 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
 
 
 					// Create bill and Classify billed
-					if (! empty($conf->facture->enabled) && $object->statut > 0  && ! $object->billed)
+					if (! empty($conf->facture->enabled) && $object->statut > 0 && $object->on_process == 1 && ! $object->billed)
 					{
 						if ($user->rights->facture->creer && empty($conf->global->WORKFLOW_DISABLE_CREATE_INVOICE_FROM_ORDER))
 						{
 							print '<a class="butAction" href="'.DOL_URL_ROOT.'/compta/facture.php?action=create&amp;origin='.$object->element.'&amp;originid='.$object->id.'&amp;socid='.$object->socid.'">'.$langs->trans("CreateBill").'</a>';
 						}
-						if ($user->rights->commande->creer && $object->statut > 2 && empty($conf->global->WORKFLOW_DISABLE_CLASSIFY_BILLED_FROM_ORDER) && empty($conf->global->WORsKFLOW_BILL_ON_SHIPMENT))
+						if ($user->rights->repair->creer && $object->statut > 2 && empty($conf->global->WORKFLOW_DISABLE_CLASSIFY_BILLED_FROM_ORDER) && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))
 						{
 							print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&amp;action=classifybilled">'.$langs->trans("ClassifyBilled").'</a>';
 						}
 					}
 
 					// Set to shipped
-					if (($object->statut == 1 || $object->statut == 2) && $user->rights->commande->cloturer)
+					if (($object->statut == 1 || $object->statut == 2)  && $object->on_process == 1 && $user->rights->commande->cloturer)
 					{
 						print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&amp;action=shipped">'.$langs->trans('ClassifyShipped').'</a>';
 					}
 
 					// Clone
-					if ($user->rights->repair->write)
+					if ($user->rights->repair->creer)
 					{
 						print '<a class="butAction" href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&amp;socid='.$object->socid.'&amp;action=clone&amp;object=order">'.$langs->trans("ToClone").'</a>';
 					}
 
 					// Cancel order
-					if ($object->statut == 1 && $user->rights->repair->annuler)
+					if ($object->statut == 1 && $object->on_process == 1 && $user->rights->repair->annuler)
 					{
 						print '<a class="butActionDelete" href="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'&amp;action=cancel">'.$langs->trans('Cancel').'</a>';
 					}
@@ -2887,7 +2933,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
 				$relativepath = $comref.'/'.$comref.'.pdf';
 				$filedir = $conf->repair->dir_output . '/' . $comref;
 				$urlsource=$_SERVER["PHP_SELF"]."?id=".$object->id;
-				$genallowed=$user->rights->repair->write;
+				$genallowed=$user->rights->repair->creer;
 				$delallowed=$user->rights->repair->delete;
 //TODO Probleme de generation de document
 

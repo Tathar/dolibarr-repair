@@ -6,7 +6,7 @@
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
@@ -24,9 +24,9 @@
  *	\brief      Home page of customer order module
  */
 
-require("../main.inc.php");
-require_once(DOL_DOCUMENT_ROOT."/core/class/html.formfile.class.php");
-require_once(DOL_DOCUMENT_ROOT ."/core/class/notify.class.php");
+require '../main.inc.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
+require_once DOL_DOCUMENT_ROOT .'/core/class/notify.class.php';
 require_once(DOL_DOCUMENT_ROOT ."/repair/class/repair.class.php");
 
 if (!$user->rights->repair->read) accessforbidden();
@@ -63,7 +63,7 @@ print '<tr><td valign="top" width="30%" class="notopnoleft">';
  * Search form
  */
 $var=false;
-print '<table class="noborder" width="100%">';
+print '<table class="noborder nohover" width="100%">';
 print '<form method="post" action="liste.php">';
 print '<input type="hidden" name="token" value="'.$_SESSION['newtoken'].'">';
 print '<tr class="liste_titre"><td colspan="3">'.$langs->trans("SearchRepair").'</td></tr>';
@@ -78,7 +78,7 @@ print "</form></table><br>\n";
  * Statistics
  */
 
-$sql = "SELECT count(c.rowid), c.repair_statut, c.facture";
+$sql = "SELECT count(c.rowid), c.fk_statut, c.on_process, c.facture";
 $sql.= " FROM ".MAIN_DB_PREFIX."societe as s";
 $sql.= ", ".MAIN_DB_PREFIX."repair as c";
 if (! $user->rights->societe->client->voir && ! $socid) $sql.= ", ".MAIN_DB_PREFIX."societe_commerciaux as sc";
@@ -86,7 +86,7 @@ $sql.= " WHERE c.fk_soc = s.rowid";
 $sql.= " AND c.entity = ".$conf->entity;
 if ($user->societe_id) $sql.=' AND c.fk_soc = '.$user->societe_id;
 if (! $user->rights->societe->client->voir && ! $socid) $sql.= " AND s.rowid = sc.fk_soc AND sc.fk_user = " .$user->id;
-$sql.= " GROUP BY c.repair_statut, c.facture";
+$sql.= " GROUP BY c.fk_statut, c.on_process, c.facture";
 $resql = $db->query($sql);
 if ($resql)
 {
@@ -97,6 +97,7 @@ if ($resql)
     $totalinprocess=0;
     $dataseries=array();
     $vals=array();
+	$all=array();
     $bool=false;
     // -1=Canceled, 0=Draft, 1=Validated, 2=Accepted/On process, 3=Closed (Sent/Received, billed or not)
     while ($i < $num)
@@ -104,12 +105,8 @@ if ($resql)
         $row = $db->fetch_row($resql);
         if ($row)
         {
-            //if ($row[1]!=-1 && ($row[1]!=3 || $row[2]!=1))
-            {
-                $bool=$row[2]?true:false;
-                $vals[$row[1].$bool]+=$row[0];
+  				$all[]=$row;
                 $totalinprocess+=$row[0];
-            }
             $total+=$row[0];
         }
         $i++;
@@ -117,14 +114,15 @@ if ($resql)
     $db->free($resql);
     print '<table class="noborder" width="100%">';
     print '<tr class="liste_titre"><td colspan="2">'.$langs->trans("Statistics").' - '.$langs->trans("CustomersRepairs").'</td></tr>'."\n";
-    $listofstatus=array(0,3,4,7,8,8,-1,-2);
+    $listofstatus=array(0,0,1,1,3,3,-1);
+	$listofprocess=array(0,1,2);
     $bool=false;
-    foreach ($listofstatus as $status)
-    {
-        $dataseries[]=array('label'=>$repairstatic->LibStatut($status,$bool,1),'data'=>(isset($vals[$status.$bool])?(int) $vals[$status.$bool]:0));
-        if ($status==8 && $bool==false) $bool=true;
-        else $bool=false;
-    }
+	foreach ($all as $line)
+	{
+		dol_syslog("index Statistics line ".$line[0]."| ".$repairstatic->LibStatut($line[1],$line[2],$line[3],1), LOG_DEBUG);
+		$dataseries[]=array('label'=>$repairstatic->LibStatut($line[1],$line[2],$line[3],1),'data'=>(isset($line[0])?(int) $line[0]:0));
+	}
+
     if ($conf->use_javascript_ajax)
     {
         print '<tr><td align="center" colspan="2">';
@@ -134,15 +132,15 @@ if ($resql)
     }
     $var=true;
     $bool=false;
-    foreach ($listofstatus as $status)
+    foreach ($all as $line)
     {
         if (! $conf->use_javascript_ajax)
         {
             $var=!$var;
             print "<tr ".$bc[$var].">";
-            print '<td>'.$repairstatic->LibStatut($status,$bool,0).'</td>';
-            print '<td align="right"><a href="liste.php?viewstatut='.$status.'">'.(isset($vals[$status.$bool])?$vals[$status.$bool]:0).' ';
-            print $repairstatic->LibStatut($status,$bool,3);
+            print '<td>'.$repairstatic->LibStatut($line[1],$line[2],$line[3],0).'</td>';
+            print '<td align="right"><a href="liste.php?viewstatut='.$status.'">'.(isset($line[0])?$line[0]:0).' ';
+            print $repairstatic->LibStatut($line[1],$line[2],$line[3],3);
             print '</a>';
             print '</td>';
             print "</tr>\n";
@@ -162,7 +160,7 @@ else
 
 
 /*
- * Draft orders
+ * Draft Repair
  */
 if ($conf->repair->enabled)
 {
@@ -172,7 +170,7 @@ if ($conf->repair->enabled)
 	if (!$user->rights->societe->client->voir && !$socid) $sql.= ", ".MAIN_DB_PREFIX."societe_commerciaux as sc";
 	$sql.= " WHERE c.fk_soc = s.rowid";
 	$sql.= " AND c.entity = ".$conf->entity;
-	$sql.= " AND c.repair_statut = 0";
+	$sql.= " AND c.fk_statut = 0 AND c.on_process = 0";
 	if ($socid) $sql.= " AND c.fk_soc = ".$socid;
 	if (!$user->rights->societe->client->voir && !$socid) $sql.= " AND s.rowid = sc.fk_soc AND sc.fk_user = " .$user->id;
 
@@ -181,7 +179,7 @@ if ($conf->repair->enabled)
 	{
 		print '<table class="noborder" width="100%">';
 		print '<tr class="liste_titre">';
-		print '<td colspan="3">'.$langs->trans("StatusRepairWaitingEstimate").'</td></tr>';
+		print '<td colspan="3">'.$langs->trans("StatusWaitingRepair").'</td></tr>';
 		$langs->load("repairlang@repair");
 		$num = $db->num_rows($resql);
 		if ($num)
@@ -214,7 +212,7 @@ $max=5;
  * Last modified orders
  */
 
-$sql = "SELECT c.rowid, c.ref, c.repair_statut, c.facture, c.date_cloture as datec, c.tms as datem,";
+$sql = "SELECT c.rowid, c.ref, c.fk_statut, c.on_process, c.facture, c.date_cloture as datec, c.tms as datem,";
 $sql.= " s.nom, s.rowid as socid";
 $sql.= " FROM ".MAIN_DB_PREFIX."repair as c,";
 $sql.= " ".MAIN_DB_PREFIX."societe as s";
@@ -271,7 +269,7 @@ if ($resql)
 			print '<td width="200">'.$repairstatic->getThirdpartyUrl(1,$obj->socid,24).'</td>';
 //			print '<td width="200"><a href="'.DOL_URL_ROOT.'/comm/fiche.php?socid='.$obj->socid.'">'.img_object($langs->trans("ShowCompany"),"company").' '.dol_trunc($obj->nom,24).'</a></td>';
 			print '<td>'.dol_print_date($db->jdate($obj->datem),'day').'</td>';
-			print '<td align="right">'.$repairstatic->LibStatut($obj->repair_statut,$obj->facture,5).'</td>';
+			print '<td align="right">'.$repairstatic->LibStatut($obj->fk_statut,$obj->on_process,$obj->facture,5).'</td>';
 			print '</tr>';
 			$i++;
 		}
@@ -286,13 +284,13 @@ else dol_print_error($db);
  */
 if ($conf->repair->enabled)
 {
-	$sql = "SELECT c.rowid, c.ref, c.repair_statut, c.date_repair, c.facture, s.nom, s.rowid as socid";
+	$sql = "SELECT c.rowid, c.ref, c.fk_statut, c.on_process, c.date_repair, c.facture, s.nom, s.rowid as socid";
 	$sql.=" FROM ".MAIN_DB_PREFIX."repair as c";
 	$sql.= ", ".MAIN_DB_PREFIX."societe as s";
 	if (!$user->rights->societe->client->voir && !$socid) $sql.= ", ".MAIN_DB_PREFIX."societe_commerciaux as sc";
 	$sql.= " WHERE c.fk_soc = s.rowid";
 	$sql.= " AND c.entity = ".$conf->entity;
-	$sql.= " AND c.repair_statut = 4";
+	$sql.= " AND c.fk_statut = 0 AND on_process = 0";
 	if ($socid) $sql.= " AND c.fk_soc = ".$socid;
 	if (!$user->rights->societe->client->voir && !$socid) $sql.= " AND s.rowid = sc.fk_soc AND sc.fk_user = " .$user->id;
 	$sql.= " ORDER BY c.rowid DESC";
@@ -342,7 +340,7 @@ if ($conf->repair->enabled)
 //				print '<td width="200"><a href="'.DOL_URL_ROOT.'/comm/fiche.php?socid='.$obj->socid.'">'.img_object($langs->trans("ShowCompany"),"company").' '.dol_trunc($obj->nom,24).'</a></td>';
 				
 				print '<td>'.dol_print_date($db->jdate($obj->date_repair),'day').'</td>';
-				print '<td align="right">'.$repairstatic->LibStatut($obj->repair_statut,$obj->facture,5).'</td>';
+				print '<td align="right">'.$repairstatic->LibStatut($obj->fk_statut,$obj->on_process,$obj->facture,5).'</td>';
 
 				print '</tr>';
 				$i++;
@@ -355,17 +353,18 @@ if ($conf->repair->enabled)
 }
 
 /*
- * Repairs thar are in a shipping process
+ * Repairs Completed
  */
+
 if ($conf->repair->enabled)
 {
-	$sql = "SELECT c.rowid, c.ref, c.repair_statut, c.date_repair, c.facture, s.nom, s.rowid as socid";
+	$sql = "SELECT c.rowid, c.ref, c.fk_statut, c.on_process, c.date_repair, c.facture, s.nom, s.rowid as socid";
 	$sql.= " FROM ".MAIN_DB_PREFIX."repair as c";
 	$sql.= ", ".MAIN_DB_PREFIX."societe as s";
 	if (!$user->rights->societe->client->voir && !$socid) $sql.= ", ".MAIN_DB_PREFIX."societe_commerciaux as sc";
 	$sql.= " WHERE c.fk_soc = s.rowid";
 	$sql.= " AND c.entity = ".$conf->entity;
-	$sql.= " AND c.repair_statut = 5 ";
+	$sql.= " AND c.fk_statut = 1 AND c.on_process = 0";
 	if ($socid) $sql.= " AND c.fk_soc = ".$socid;
 	if (!$user->rights->societe->client->voir && !$socid) $sql.= " AND s.rowid = sc.fk_soc AND sc.fk_user = " .$user->id;
 	$sql.= " ORDER BY c.rowid DESC";
@@ -377,7 +376,7 @@ if ($conf->repair->enabled)
 
 		print '<table class="noborder" width="100%">';
 		print '<tr class="liste_titre">';
-		print '<td colspan="4">'.$langs->trans("StatusRepairComplete").' <a href="'.DOL_URL_ROOT.'/repair/liste.php?viewstatut=2">('.$num.')</a></td></tr>';
+		print '<td colspan="4">'.$langs->trans("StatusRepairCompleted").' <a href="'.DOL_URL_ROOT.'/repair/liste.php?viewstatut=2">('.$num.')</a></td></tr>';
 
 		if ($num)
 		{
@@ -415,7 +414,80 @@ if ($conf->repair->enabled)
 //				print '<td width="200"><a href="'.DOL_URL_ROOT.'/comm/fiche.php?socid='.$obj->socid.'">'.img_object($langs->trans("ShowCompany"),"company").' '.dol_trunc($obj->nom,24).'</a></td>';
 				
 				print '<td>'.dol_print_date($db->jdate($obj->date_repair),'day').'</td>';
-				print '<td align="right">'.$repairstatic->LibStatut($obj->repair_statut,$obj->facture,5).'</td>';
+				print '<td align="right">'.$repairstatic->LibStatut($obj->fk_statut,$obj->on_process,$obj->facture,5).'</td>';
+
+				print '</tr>';
+				$i++;
+			}
+		}
+		print "</table><br>";
+	}
+	else dol_print_error($db);
+}
+
+/*
+ * Repairs Validated
+ */
+
+if ($conf->repair->enabled)
+{
+	$sql = "SELECT c.rowid, c.ref, c.fk_statut, c.on_process, c.date_repair, c.facture, s.nom, s.rowid as socid";
+	$sql.= " FROM ".MAIN_DB_PREFIX."repair as c";
+	$sql.= ", ".MAIN_DB_PREFIX."societe as s";
+	if (!$user->rights->societe->client->voir && !$socid) $sql.= ", ".MAIN_DB_PREFIX."societe_commerciaux as sc";
+	$sql.= " WHERE c.fk_soc = s.rowid";
+	$sql.= " AND c.entity = ".$conf->entity;
+	$sql.= " AND c.fk_statut = 1 AND c.on_process = 1";
+	if ($socid) $sql.= " AND c.fk_soc = ".$socid;
+	if (!$user->rights->societe->client->voir && !$socid) $sql.= " AND s.rowid = sc.fk_soc AND sc.fk_user = " .$user->id;
+	$sql.= " ORDER BY c.rowid DESC";
+
+	$resql=$db->query($sql);
+	if ($resql)
+	{
+		$num = $db->num_rows($resql);
+
+		print '<table class="noborder" width="100%">';
+		print '<tr class="liste_titre">';
+		print '<td colspan="4">'.$langs->trans("StatusRepairValidated").' <a href="'.DOL_URL_ROOT.'/repair/liste.php?viewstatut=2">('.$num.')</a></td></tr>';
+
+		if ($num)
+		{
+			$i = 0;
+			$var = True;
+			while ($i < $num)
+			{
+				$var=!$var;
+				$obj = $db->fetch_object($resql);
+				print "<tr $bc[$var]>";
+				print '<td width="20%" nowrap="nowrap">';
+
+				$repairstatic->id=$obj->rowid;
+				$repairstatic->ref=$obj->ref;
+
+				print '<table class="nobordernopadding"><tr class="nocellnopadd">';
+				print '<td width="96" class="nobordernopadding" nowrap="nowrap">';
+				print $repairstatic->getNomUrl(1);
+				print '</td>';
+
+				print '<td width="16" class="nobordernopadding" nowrap="nowrap">';
+				print '&nbsp;';
+				print '</td>';
+
+				print '<td width="16" align="right" class="nobordernopadding">';
+				$filename=dol_sanitizeFileName($obj->ref);
+				$filedir=$conf->repair->dir_output . '/' . dol_sanitizeFileName($obj->ref);
+				$urlsource=$_SERVER['PHP_SELF'].'?id='.$obj->rowid;
+				$formfile->show_documents('repair',$filename,$filedir,$urlsource,'','','',1,'',1);
+				print '</td></tr></table>';
+
+				print '</td>';
+
+				print '<td width="200">'.$repairstatic->getThirdpartyUrl(1,$obj->socid,24).'</td>';
+//				print '<td width="200"><a href="'.DOL_URL_ROOT.'/comm/fiche.php?socid='.$obj->socid.'">'.img_object($langs->trans("ShowCompany"),"company").' '.dol_trunc($obj->nom,24).'</a></td>';
+				
+				print '<td>'.dol_print_date($db->jdate($obj->date_repair),'day').'</td>';
+				print '<td align="right">'.$repairstatic->LibStatut($obj->fk_statut,$obj->on_process,$obj->facture,5).'</td>';
 
 				print '</tr>';
 				$i++;

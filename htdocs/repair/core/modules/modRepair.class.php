@@ -144,7 +144,7 @@ class modRepair extends DolibarrModules
 		$this->rights[$r][1] = 'Créer/modifier les réparations';
 		$this->rights[$r][2] = 'w';
 		$this->rights[$r][3] = 0;
-		$this->rights[$r][4] = 'write';
+		$this->rights[$r][4] = 'creer';
 /*
 		$r++;
 		$this->rights[$r][0] = 12504;

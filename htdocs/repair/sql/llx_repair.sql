@@ -45,7 +45,7 @@ create table llx_repair
   date_repair			date,							-- date de la repair
 
   date_calc				datetime,						-- date de calcule de temp de realisation	TODO
-  time_used				datetime,						-- temp passe a faire la reparation			TODO
+  time_repair			integer,						-- temp passe a faire la reparation			TODO
 
   fk_user_author		integer,						-- createur de la repair
   fk_user_valid			integer,						-- valideur de la reparation

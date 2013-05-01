@@ -113,19 +113,19 @@ if ($viewstatut <> '')
 	}
 	if ($viewstatut == 1) // en cours
 	{
-		$sql.= ' AND c.fk_statut = 0 AND c.on_process = 1'; 
+		$sql.= ' AND c.fk_statut = 0 AND c.on_process != 0'; 
 	}
 	if ($viewstatut == 2) // terminee
 	{
-		$sql.= ' AND c.fk_statut = 1'; 
+		$sql.= ' AND c.fk_statut = 1 AND c.on_process = 0'; 
 	}
 	if ($viewstatut == 3) // validee
 	{
-		$sql.= ' AND c.fk_statut = 2'; 
+		$sql.= ' AND c.fk_statut = 1 AND c.on_process = 1'; 
 	}
 	if ($viewstatut == 4) //a facturer
 	{
-		$sql.= ' AND c.fk_statut = 2 AND c.facture = 0'; // need to create invoice
+		$sql.= ' AND c.fk_statut = 3 AND c.facture = 0'; // need to create invoice
 	}
 	if ($viewstatut == 5) // cloturee
 	{

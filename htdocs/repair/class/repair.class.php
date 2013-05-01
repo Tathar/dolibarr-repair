@@ -64,8 +64,8 @@ class Repair extends CommonOrder
 	var $support_id;
 //TODO fk_machine_lend 
 	var $accessory;
-	var $statut;		// -1=Canceled, 0=Draft, 1=finished, 2=Validated, 3=Closed (Sent/Received, billed or not)
-	var $on_process;		// 0=Waiting, 1=On process
+	var $statut;		// -1=Canceled, 0=Draft, 1=Repaired/Validated, (2=Accepted/On process not managed for customer orders), 3=Closed (Sent/Received, billed or not)
+	var $on_process;		// 0=Waiting/Repaired, 1=On process/Validated, 2=paused
 
     var $facturee;		// Facturee ou non
     var $brouillon;
@@ -195,9 +195,9 @@ class Repair extends CommonOrder
         $error=0;
 
         // Protection
-        if ($this->statut == 1)
+        if ($this->statut != 1 || on_process != 0)
         {
-            dol_syslog(get_class($this)."::valid no draft status", LOG_WARNING);
+            dol_syslog(get_class($this)."::valid no repaired status", LOG_WARNING);
             return 0;
         }
 
@@ -233,7 +233,7 @@ class Repair extends CommonOrder
         $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
         $sql.= " SET ref = '".$num."',";
         $sql.= " fk_statut = 1,";
-        $sql.= " on_process = 0,";
+        $sql.= " on_process = 1,";
         $sql.= " date_valid='".$this->db->idate($now)."',";
         $sql.= " fk_user_valid = ".$user->id;
         $sql.= " WHERE rowid = ".$this->id;
@@ -304,6 +304,7 @@ class Repair extends CommonOrder
         {
             $this->ref = $num;
             $this->statut = 1;
+            $this->on_process = 1;
         }
 
         if (! $error)
@@ -431,7 +432,7 @@ class Repair extends CommonOrder
         $this->db->begin();
 
         $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
-        $sql.= ' SET fk_statut=1, facture=0';
+        $sql.= ' SET fk_statut=1, on_process=1, facture=0';
         $sql.= ' WHERE rowid = '.$this->id;
 
         dol_syslog("Repair::set_reopen sql=".$sql);
@@ -455,6 +456,7 @@ class Repair extends CommonOrder
         if (! $error)
         {
         	$this->statut = 1;
+        	$this->on_process = 1;
         	$this->billed = 0;
         	$this->facturee = 0; // deprecated
 
@@ -488,7 +490,7 @@ class Repair extends CommonOrder
 
             $sql = 'UPDATE '.MAIN_DB_PREFIX.'repair';
             $sql.= ' SET fk_statut = 3,';
-            $sql.= ' on_process = 0,';
+            $sql.= ' on_process = 1,';
             $sql.= ' fk_user_cloture = '.$user->id.',';
             $sql.= ' date_cloture = '.$this->db->idate($now);
             $sql.= ' WHERE rowid = '.$this->id.' AND fk_statut > 0';
@@ -505,7 +507,7 @@ class Repair extends CommonOrder
                 if (! $error)
                 {
                 	$this->statut=3;
-            		$this->on_process=0;
+            		$this->on_process=1;
                     $this->db->commit();
                     return 1;
                 }
@@ -554,7 +556,6 @@ class Repair extends CommonOrder
 
         $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
         $sql.= " SET fk_statut = -1,";
-        $sql.= " on_process = 0";
         $sql.= " WHERE rowid = ".$this->id;
 		$sql.= " AND fk_statut = 1";
 
@@ -597,7 +598,6 @@ class Repair extends CommonOrder
 			if (! $error)
 			{
 				$this->statut=-1;
-            	$this->on_process=0;
 				$this->db->commit();
 				return 1;
 			}
@@ -2552,7 +2552,7 @@ class Repair extends CommonOrder
      */
     function getLibStatut($mode)
     {
-        return $this->LibStatut($this->statut,$this->facturee,$mode);
+        return $this->LibStatut($this->statut,$this->on_process,$this->facturee,$mode);
     }
 
     /**
@@ -2572,8 +2572,9 @@ class Repair extends CommonOrder
             if ($statut==-1) return $langs->trans('StatusRepairCanceled');
             if ($statut==0 && $on_process == 0) return $langs->trans('StatusRepairDraft');
             if ($statut==0 && $on_process == 1) return $langs->trans('StatusRepairOnProcess');
-			if ($statut==1) return $langs->trans('StatusRepairCompleted');
-            if ($statut==2) return $langs->trans('StatusRepairValidated');
+			if ($statut==0 && $on_process == 2) return $langs->trans('StatusRepairPaused');
+			if ($statut==1 && $on_process == 0) return $langs->trans('StatusRepairCompleted');
+            if ($statut==1 && $on_process == 1) return $langs->trans('StatusRepairValidated');
             if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairToBill');
             if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairProcessed');
         
@@ -2583,8 +2584,9 @@ class Repair extends CommonOrder
 			if ($statut==-1) return $langs->trans('StatusRepairCanceledShort');
             if ($statut==0 && $on_process == 0) return $langs->trans('StatusRepairDraftShort');
             if ($statut==0 && $on_process == 1) return $langs->trans('StatusRepairOnProcessShort');
-            if ($statut==1) return $langs->trans('StatusRepairCompletedShort');
-            if ($statut==2) return $langs->trans('StatusRepairValidatedShort');
+            if ($statut==0 && $on_process == 2) return $langs->trans('StatusRepairPausedShort');
+            if ($statut==1 && $on_process == 0) return $langs->trans('StatusRepairCompletedShort');
+            if ($statut==1 && $on_process == 1) return $langs->trans('StatusRepairValidatedShort');
             if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairToBillShort');
             if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairProcessed');
         }
@@ -2592,9 +2594,10 @@ class Repair extends CommonOrder
         {
             if ($statut==-1) return img_picto($langs->trans('StatusRepairCanceled'),'statut5').' '.$langs->trans('StatusRepairCanceledShort');
             if ($statut==0 && $on_process == 0) return img_picto($langs->trans('StatusRepairDraft'),'statut0').' '.$langs->trans('StatusRepairDraftShort');
-            if ($statut==0 && $on_process == 1) return img_picto($langs->trans('StatusRepairOnProcess'),'statut0').' '.$langs->trans('StatusRepairOnProcessShort');
-            if ($statut==1) return img_picto($langs->trans('StatusRepairCompleted'),'statut1').' '.$langs->trans('StatusRepairCompletedShort');
-            if ($statut==2) return img_picto($langs->trans('StatusRepairValidated'),'statut3').' '.$langs->trans('StatusRepairValidatedShort');
+            if ($statut==0 && $on_process == 1) return img_picto($langs->trans('StatusRepairOnProcess'),'statut1').' '.$langs->trans('StatusRepairOnProcessShort');
+            if ($statut==0 && $on_process == 2) return img_picto($langs->trans('StatusRepairPaused'),'statut1').' '.$langs->trans('StatusRepairPausedShort');
+            if ($statut==1 && $on_process == 0) return img_picto($langs->trans('StatusRepairCompleted'),'statut3').' '.$langs->trans('StatusRepairCompletedShort');
+            if ($statut==1 && $on_process == 1) return img_picto($langs->trans('StatusRepairValidated'),'statut4').' '.$langs->trans('StatusRepairValidatedShort');
             if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairToBill'),'statut7').' '.$langs->trans('StatusRepairToBillShort');
             if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairProcessed'),'statut6').' '.$langs->trans('StatusRepairProcessedShort');
         }
@@ -2602,9 +2605,10 @@ class Repair extends CommonOrder
         {
             if ($statut==-1) return img_picto($langs->trans('StatusRepairCanceled'),'statut5');
             if ($statut==0 && $on_process == 0) return img_picto($langs->trans('StatusRepairDraft'),'statut0');
-            if ($statut==0 && $on_process == 1) return img_picto($langs->trans('StatusRepairOnProcess'),'statut0');
-            if ($statut==1) return img_picto($langs->trans('StatusRepairCompleted'),'statut1');
-            if ($statut==2) return img_picto($langs->trans('StatusRepairValidated'),'statut3');
+            if ($statut==0 && $on_process == 1) return img_picto($langs->trans('StatusRepairOnProcess'),'statut1');
+            if ($statut==0 && $on_process == 2) return img_picto($langs->trans('StatusRepairPaused'),'statut1');
+            if ($statut==1 && $on_process == 0) return img_picto($langs->trans('StatusRepairCompleted'),'statut3');
+            if ($statut==1 && $on_process == 1) return img_picto($langs->trans('StatusRepairValidated'),'statut4');
             if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairToBill'),'statut7');
             if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairProcessed'),'statut6');
         }
@@ -2612,9 +2616,10 @@ class Repair extends CommonOrder
         {
             if ($statut==-1) return img_picto($langs->trans('StatusRepairCanceled'),'statut5').' '.$langs->trans('StatusRepairCanceled');
             if ($statut==0 && $on_process == 0) return img_picto($langs->trans('StatusRepairDraft'),'statut0').' '.$langs->trans('StatusRepairDraft');
-            if ($statut==0 && $on_process == 1) return img_picto($langs->trans('StatusRepairOnProcess'),'statut0').' '.$langs->trans('StatusRepairOnProcess');
-            if ($statut==1) return img_picto($langs->trans('StatusRepairCompletedShort'),'statut1').' '.$langs->trans('StatusRepairCompleted');
-            if ($statut==2) return img_picto($langs->trans('StatusRepairValidatedShort'),'statut3').' '.$langs->trans('StatusRepairValidated');
+            if ($statut==0 && $on_process == 1) return img_picto($langs->trans('StatusRepairOnProcess'),'statut1').' '.$langs->trans('StatusRepairOnProcess');
+            if ($statut==0 && $on_process == 2) return img_picto($langs->trans('StatusRepairPaused'),'statut1').' '.$langs->trans('StatusRepairPaused');
+            if ($statut==1 && $on_process == 0) return img_picto($langs->trans('StatusRepairCompletedShort'),'statut3').' '.$langs->trans('StatusRepairCompleted');
+            if ($statut==1 && $on_process == 1) return img_picto($langs->trans('StatusRepairValidatedShort'),'statut4').' '.$langs->trans('StatusRepairValidated');
             if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairToBill'),'statut7').' '.$langs->trans('StatusRepairToBill');
             if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return img_picto($langs->trans('StatusRepairProcessed'),'statut6').' '.$langs->trans('StatusRepairProcessed');
         }
@@ -2622,9 +2627,10 @@ class Repair extends CommonOrder
         {
             if ($statut==-1) return $langs->trans('StatusRepairCanceledShort').' '.img_picto($langs->trans('StatusRepairCanceled'),'statut5');
             if ($statut==0 && $on_process == 0) return $langs->trans('StatusRepairDraftShort').' '.img_picto($langs->trans('StatusRepairDraft'),'statut0');
-            if ($statut==0 && $on_process == 1) return $langs->trans('StatusRepairOnProcessShort').' '.img_picto($langs->trans('StatusRepairOnProcess'),'statut0');
-            if ($statut==1) return $langs->trans('StatusRepairCompletedShort').' '.img_picto($langs->trans('StatusRepairCompleted'),'statut1');
-            if ($statut==2) return $langs->trans('StatusRepairValidatedShort').' '.img_picto($langs->trans('StatusRepairValidated'),'statut3');
+            if ($statut==0 && $on_process == 1) return $langs->trans('StatusRepairOnProcessShort').' '.img_picto($langs->trans('StatusRepairOnProcess'),'statut1');
+            if ($statut==0 && $on_process == 2) return $langs->trans('StatusRepairPausedShort').' '.img_picto($langs->trans('StatusRepairPaused'),'statut1');
+            if ($statut==1 && $on_process == 0) return $langs->trans('StatusRepairCompletedShort').' '.img_picto($langs->trans('StatusRepairCompleted'),'statut3');
+            if ($statut==1 && $on_process == 1) return $langs->trans('StatusRepairValidatedShort').' '.img_picto($langs->trans('StatusRepairValidated'),'statut4');
             if ($statut==3 && (! $facturee && empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairToBillShort').' '.img_picto($langs->trans('StatusRepairToBill'),'statut7');
             if ($statut==3 && ($facturee || ! empty($conf->global->WORKFLOW_BILL_ON_SHIPMENT))) return $langs->trans('StatusRepairProcessedShort').' '.img_picto($langs->trans('StatusRepairProcessed'),'statut6');
         }
@@ -2947,13 +2953,13 @@ class Repair extends CommonOrder
         $error=0;
 
         // Protection
-        if ($this->repair_statut != 4)
+        if ($this->fk_statut != 0 && $on_process != 0)
         {
 			dol_syslog(get_class($this)."::makeRepair wrong status ".$this->repair_statut, LOG_WARNING);
             return 0;
         }
 
-        if (! $user->rights->repair->MakeRepair)
+        if (! $user->rights->repair->Repair)
         {
             $this->error='Permission denied';
             return -1;
@@ -2963,15 +2969,68 @@ class Repair extends CommonOrder
 
         $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
         $sql.= " SET";
-		$sql.= " fk_statut = 0,";
-        $sql.= " repair_statut = 5";
+//		$sql.= " fk_statut = 0,";
+        $sql.= " on_process = 1,";
+		$sql.= " date_calc = '".$this->db->idate(dol_now())."'";
         $sql.= " WHERE rowid = ".$this->id;
 
         dol_syslog(get_class($this)."::makeRepair sql=".$sql, LOG_DEBUG);
         if ($this->db->query($sql))
         {
             $this->statut=0;
-            $this->repair_statut=5;
+            $this->on_process=1;
+            $this->db->commit();
+            return 1;
+        }
+        else
+        {
+            $this->error=$this->db->error();
+            $this->db->rollback();
+            dol_syslog($this->error, LOG_ERR);
+            return -1;
+        }
+    }
+
+    /**
+     *	Make Repair
+     *
+     *	@param	User	$user			Object user that modify
+     *	@param	int		$idwarehouse	Id warehouse to use for stock change.
+     *	@return	int						<0 if KO, >0 if OK
+     */
+    function restartRepair($user, $idwarehouse=-1)
+    {
+        global $conf,$langs;
+
+        $error=0;
+
+        // Protection
+        if ($this->fk_statut != 0 && $on_process != 2)
+        {
+			dol_syslog(get_class($this)."::restartRepair wrong status ".$this->repair_statut, LOG_WARNING);
+            return 0;
+        }
+
+        if (! $user->rights->repair->Repair)
+        {
+            $this->error='Permission denied';
+            return -1;
+        }
+
+        $this->db->begin();
+
+        $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
+        $sql.= " SET";
+//		$sql.= " fk_statut = 0,";
+        $sql.= " on_process = 1,";
+		$sql.= " date_calc = '".$this->db->idate(dol_now())."'";
+        $sql.= " WHERE rowid = ".$this->id;
+
+        dol_syslog(get_class($this)."::restartRepair sql=".$sql, LOG_DEBUG);
+        if ($this->db->query($sql))
+        {
+            $this->statut=0;
+            $this->on_process=1;
             $this->db->commit();
             return 1;
         }
@@ -2991,7 +3050,7 @@ class Repair extends CommonOrder
      *	@param	int		$idwarehouse	Id warehouse to use for stock change.
      *	@return	int						<0 if KO, >0 if OK
      */
-    function unaccepteEstimate($user, $idwarehouse=-1)
+/*    function unaccepteEstimate($user, $idwarehouse=-1)
     {
         global $conf,$langs;
 
@@ -3034,6 +3093,83 @@ class Repair extends CommonOrder
             return -1;
         }
     }
+*/
+
+    /**
+     *	Pause Repair
+     *
+     *	@param	User	$user			Object user that modify
+     *	@param	int		$idwarehouse	Id warehouse to use for stock change.
+     *	@return	int						<0 if KO, >0 if OK
+     */
+    function pauseRepair($user, $idwarehouse=-1)
+    {
+        global $conf,$langs;
+
+        $error=0;
+		$time_repair=0;
+
+        // Protection
+        if ($this->fk_statut != 0 && on_process != 1 )
+        {
+			dol_syslog(get_class($this)."::pauseRepair wrong status ".$this->repair_statut, LOG_WARNING);
+            return 0;
+        }
+
+        if (! $user->rights->repair->Repair)
+        {
+            $this->error='Permission denied';
+            return -1;
+        }
+
+		$sql = "SELECT c.date_calc, c.time_repair";
+        $sql.= " FROM ".MAIN_DB_PREFIX."repair as c";
+        $sql.= " WHERE c.rowid = ".$this->id;
+
+        $result=$this->db->query($sql);
+        if ($result)
+        {
+            $numc = $this->db->num_rows($result);
+            if ($numc)
+            {
+                $obj = $this->db->fetch_object($result);
+				$diff_sec = dol_now() - $this->db->jdate($obj->date_calc);
+				$time_repair = $obj->time_repair +  $diff_sec;
+			}
+        }
+        else
+        {
+            dol_print_error($this->db);
+            return -1;
+        }
+		dol_syslog(get_class($this)."::pauseRepair diff_sec = ".$diff_sec." = ".dol_now()." - " . $this->db->jdate($obj->date_calc), LOG_DEBUG);
+		dol_syslog(get_class($this)."::pauseRepair time_repair = ".$time_repair." = ".$obj->time_repair." + ".$diff_sec, LOG_DEBUG);
+        $this->db->begin();
+
+        $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
+        $sql.= " SET";
+		$sql.= " fk_statut = 0,";
+        $sql.= " on_process = 2,";
+		$sql.= " date_calc = '0',";
+		$sql.= " time_repair = '". $time_repair ."'";
+        $sql.= " WHERE rowid = ".$this->id;
+
+        dol_syslog(get_class($this)."::pauseRepair sql=".$sql, LOG_DEBUG);
+        if ($this->db->query($sql))
+        {
+            $this->statut=0;
+            $this->on_process=2;
+            $this->db->commit();
+            return 1;
+        }
+        else
+        {
+            $this->error=$this->db->error();
+            $this->db->rollback();
+            dol_syslog($this->error, LOG_ERR);
+            return -1;
+        }
+    }
 
     /**
      *	Finish Repair
@@ -3047,33 +3183,58 @@ class Repair extends CommonOrder
         global $conf,$langs;
 
         $error=0;
+		$time_repair=0;
 
         // Protection
-        if ($this->repair_statut != 5)
+        if ($this->fk_statut != 0 && on_process != 1 )
         {
 			dol_syslog(get_class($this)."::finishRepair wrong status ".$this->repair_statut, LOG_WARNING);
             return 0;
         }
 
-        if (! $user->rights->repair->MakeRepair)
+        if (! $user->rights->repair->Repair)
         {
             $this->error='Permission denied';
             return -1;
         }
 
+		$sql = "SELECT c.date_calc, c.time_repair";
+        $sql.= " FROM ".MAIN_DB_PREFIX."repair as c";
+        $sql.= " WHERE c.rowid = ".$this->id;
+
+        $result=$this->db->query($sql);
+        if ($result)
+        {
+            $numc = $this->db->num_rows($result);
+            if ($numc)
+            {
+                $obj = $this->db->fetch_object($result);
+				$diff_sec = dol_now() - $this->db->jdate($obj->date_calc);
+				$time_repair = $obj->time_repair +  $diff_sec;
+			}
+        }
+        else
+        {
+            dol_print_error($this->db);
+            return -1;
+        }
+		dol_syslog(get_class($this)."::finishRepair diff_sec = ".$diff_sec." = ".dol_now()." - " . $this->db->jdate($obj->date_calc), LOG_DEBUG);
+		dol_syslog(get_class($this)."::finishRepair time_repair = ".$time_repair." = ".$obj->time_repair." + ".$diff_sec, LOG_DEBUG);
         $this->db->begin();
 
         $sql = "UPDATE ".MAIN_DB_PREFIX."repair";
         $sql.= " SET";
 		$sql.= " fk_statut = 1,";
-        $sql.= " repair_statut = 6";
+        $sql.= " on_process = 0,";
+		$sql.= " date_calc = '0',";
+		$sql.= " time_repair = '". $time_repair ."'";
         $sql.= " WHERE rowid = ".$this->id;
 
         dol_syslog(get_class($this)."::finishRepair sql=".$sql, LOG_DEBUG);
         if ($this->db->query($sql))
         {
             $this->statut=1;
-            $this->repair_statut=6;
+            $this->on_process=0;
             $this->db->commit();
             return 1;
         }
@@ -3246,7 +3407,7 @@ class Repair extends CommonOrder
      *	@param	int		$idwarehouse	Id warehouse to use for stock change.
      *	@return	int						<0 if KO, >0 if OK
      */
-    function reopen_unvalidedEstimate($user, $idwarehouse=-1)
+/*    function reopen_unvalidedEstimate($user, $idwarehouse=-1)
     {
         global $conf,$langs;
 
@@ -3289,7 +3450,7 @@ class Repair extends CommonOrder
             return -1;
         }
     }
-
+*/
 
     /**
      *	Set trademark
@@ -3681,7 +3842,7 @@ class Repair extends CommonOrder
         $result='';
         $lien=$lienfin='';
 
-        $lien = '<a href="'.DOL_URL_ROOT.'/repair/thirdparty.php?id='.$socid;
+        $lien = '<a href="'.DOL_URL_ROOT.'/machine/thirdparty.php?id='.$socid;
         // Add type of canvas
         $lien.=(!empty($objsoc->canvas)?'&amp;canvas='.$objsoc->canvas:'').'">';
         $lienfin='</a>';
