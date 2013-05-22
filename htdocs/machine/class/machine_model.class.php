@@ -85,9 +85,7 @@ class Machine_model // extends CommonObject
 		dol_syslog(get_class($this)."::create trademark is Null", LOG_ERR);
 		return -1;
 		}
-
-//		if (isset($this->fk_trademark)) $this->fk_trademark=trim($this->fk_trademark);
-		if (isset($this->type_id)) $this->type=trim_id($this->type_id);
+		if (isset($this->type_id)) $this->type_id=trim($this->type_id);
 		if (isset($this->model)) $this->model=trim($this->model);
 		if (isset($this->n_model)) $this->n_model=trim($this->n_model);
 

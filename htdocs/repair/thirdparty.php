@@ -582,7 +582,7 @@ if ($id > 0)
 	 */
 	print '<div class="tabsAction">';
 
-	if ($conf->repair->enabled && $user->rights->repair->write)
+	if ($conf->repair->enabled && $user->rights->repair->creer)
 	{
 		$langs->load("repairlang@repair");
 		print '<a class="butAction" href="'.DOL_URL_ROOT.'/repair/fiche.php?socid='.$object->id.'&amp;action=create">'.$langs->trans("AddRepair").'</a>';

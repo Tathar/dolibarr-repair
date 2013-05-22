@@ -409,7 +409,7 @@ if ($id > 0)
 		$repair_static=new Repair($db);
 
 		$sql = "SELECT s.nom, s.rowid,";
-		$sql.= " c.rowid as cid, c.total_ht, c.ref, c.repair_statut, c.facture,";
+		$sql.= " c.rowid as cid, c.total_ht, c.ref, c.fk_statut, c.on_process, c.facture,";
 		$sql.= " c.date_repair as dc";
 		$sql.= " FROM ".MAIN_DB_PREFIX."societe as s, ".MAIN_DB_PREFIX."repair as c";
 		$sql.= " WHERE c.fk_soc = s.rowid ";
@@ -443,7 +443,7 @@ if ($id > 0)
 				print '<td nowrap="nowrap"><a href="'.DOL_URL_ROOT.'/repair/fiche.php?id='.$objp->cid.'">'.img_object($langs->trans("ShowRepair"),"repair@repair").' '.$objp->ref."</a>\n";
 				print '</td><td align="right" width="80">'.dol_print_date($db->jdate($objp->dc),'day')."</td>\n";
 				print '<td align="right" width="120">'.price($objp->total_ht).'</td>';
-				print '<td align="right" width="130">'.$repair_static->LibStatut($objp->repair_statut,$objp->facture,5).'</td></tr>';
+				print '<td align="right" width="130">'.$repair_static->LibStatut($objp->fk_statut,$objp->on_process,$objp->facturee,5).'</td></tr>';
 				$i++;
 			}
 			$db->free($resql);
@@ -459,7 +459,7 @@ if ($id > 0)
 	/*
 	 * Last linked contracts
 	 */
-	if ($conf->contrat->enabled && $user->rights->contrat->read)
+	if ($conf->contrat->enabled && $user->rights->contrat->lire)
 	{
 		$contratstatic=new Contrat($db);
 
@@ -519,7 +519,7 @@ if ($id > 0)
 	/*
 	 * Last interventions
 	 */
-	if ($conf->ficheinter->enabled && $user->rights->ficheinter->read)
+	if ($conf->ficheinter->enabled && $user->rights->ficheinter->lire)
 	{
 		$sql = "SELECT s.nom, s.rowid, f.rowid as id, f.ref, f.fk_statut, f.duree as duration, f.datei as startdate";
 		$sql.= " FROM ".MAIN_DB_PREFIX."societe as s, ".MAIN_DB_PREFIX."fichinter as f";
@@ -584,7 +584,7 @@ if ($id > 0)
 	 */
 	print '<div class="tabsAction">';
 
-	if ($conf->repair->enabled && $user->rights->repair->write)
+	if ($conf->repair->enabled && $user->rights->repair->creer)
 	{
 		$langs->load("repairlang@repair");
 		print '<a class="butAction" href="'.DOL_URL_ROOT.'/repair/fiche.php?socid='.$object->id.'&amp;action=create">'.$langs->trans("AddRepair").'</a>';

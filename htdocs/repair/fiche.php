@@ -267,7 +267,7 @@ else if ($action == 'add' && $user->rights->repair->creer)
 //<Tathar>
 		$object->trademark            = $_POST['trademark'];
 		$object->support_id            = $_POST['support_id'];
-		$object->model            	  = $_POST['model'];
+		$object->model            	  = $_POST['m_model'];
 		$object->n_model              = $_POST['n_model'];
 		$object->serial_num              = $_POST['serial_num'];
 		$object->breakdown              = $_POST['breakdown'];
@@ -415,23 +415,23 @@ else if ($action == 'add' && $user->rights->repair->creer)
 					$object->add_product($_POST[$xid],$_POST[$xqty],$_POST[$xremise]);
 				}
 			}
+/*
+		if (empty($conf->global->MAIN_DISABLE_PDF_AUTOUPDATE))
+        {
+        	// Define output language
+         	$outputlangs = $langs;
+         	$newlang=GETPOST('lang_id','alpha');
+         	if ($conf->global->MAIN_MULTILANGS && empty($newlang)) $newlang=$object->client->default_lang;
+        	if (! empty($newlang))
+         	{
+            	$outputlangs = new Translate("",$conf);
+            	$outputlangs->setDefaultLang($newlang);
+      		}
 
-//		if (empty($conf->global->MAIN_DISABLE_PDF_AUTOUPDATE))
-//        {
-//        	// Define output language
-//         	$outputlangs = $langs;
-//         	$newlang=GETPOST('lang_id','alpha');
-//         	if ($conf->global->MAIN_MULTILANGS && empty($newlang)) $newlang=$object->client->default_lang;
-//        	if (! empty($newlang))
-//         	{
-//            	$outputlangs = new Translate("",$conf);
-//            	$outputlangs->setDefaultLang($newlang);
-//      		}
-
-//		$ret=$object->fetch($id);    // Reload to get new records
-//		repair_pdf_create($db, $object, $object->modelpdf, $outputlangs, GETPOST('hidedetails'), GETPOST('hidedesc'), GETPOST('hideref'), $hookmanager);
-		repair_pdf_create($db, $object, "RepairLabel", $outputlangs, GETPOST('hidedetails'), GETPOST('hidedesc'), GETPOST('hideref'), $hookmanager);
+		$ret=$object->fetch($id);    // Reload to get new records
+		repair_pdf_create($db, $object, $object->modelpdf, $outputlangs, GETPOST('hidedetails'), GETPOST('hidedesc'), GETPOST('hideref'), $hookmanager);
 		}
+*/		}
 
 		// Insert default contacts if defined
 		if ($object_id > 0)
@@ -1415,56 +1415,64 @@ if ($action == 'send' && ! GETPOST('addfile') && ! GETPOST('removedfile') && ! G
 else if ($action == 'set_support_id' && $user->rights->repair->creer)
 {
     $object->set_support_id($user, $_POST['support_id']);
-	pdf_create_card();
+	$object->fetch($id);	// Load repair
+//	pdf_create_card();
 }
 
 // Positionne la marque de la machine
 else if ($action == 'set_trademark' && $user->rights->repair->creer)
 {
     $object->set_trademark($user, $_POST['trademark']);
-	pdf_create_card();
+	$object->fetch($id);	// Load repair
+//	pdf_create_card();
 }
 
 // Positionne le N° de modele de la machine
 else if ($action == 'set_n_model' && $user->rights->repair->creer)
 {
     $object->set_n_model($user, $_POST['n_model']);
-	pdf_create_card();
+	$object->fetch($id);	// Load repair
+//	pdf_create_card();
 }
 
 // Positionne le Type de la machine
 else if ($action == 'set_type' && $user->rights->repair->creer)
 {
     $object->set_type_id($user, $_POST['type_id']);
-	pdf_create_card();
+	$object->fetch($id);	// Load repair
+//	pdf_create_card();
 }
 
 // Positionne le Modele de la machine
 else if ($action == 'set_model' && $user->rights->repair->creer)
 {
-    $object->set_model($user, $_POST['model']);
-	pdf_create_card();
+    $object->set_model($user, $_POST['m_model']);
+	$object->fetch($id);	// Load repair
+//	pdf_create_card();
 }
 
 // Positionne le N° de serie de la machine
 else if ($action == 'set_serial_num' && $user->rights->repair->creer)
 {
     $object->set_serial_num($user, $_POST['serial_num']);
-	pdf_create_card();
+	$object->fetch($id);	// Load repair
+//	pdf_create_card();
 }
 
 // Positionne la panne de la machine
 else if ($action == 'set_breakdown' && $user->rights->repair->creer)
 {
     $object->set_breakdown($user, $_POST['breakdown']);
-	pdf_create_card();
+	$object->fetch($id);	// Load repair
+//	pdf_create_card();
 }
 
 // Positionne les accessoires de la machine
 else if ($action == 'set_accessory' && $user->rights->repair->creer)
 {
     $object->set_accessory($user, $_POST['accessory']);
-	pdf_create_card();
+	$object->fetch($id);	// Load repair
+//	pdf_create_card();
 }
 
 else if ($action == 'createestimate' && $user->rights->repair->creerEstimate)
@@ -1799,7 +1807,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
     print '</tr>';
 	// Modele
     print '<tr><td class="fieldrequired">'.$langs->trans('MachineModel').'</td><td colspan="2">';
-    print '<input type="text" name="model" value=""></td>';
+    print '<input type="text" name="m_model" value=""></td>';
     print '</tr>';
 	// Numero de Serie
     print '<tr><td class="fieldrequired">'.$langs->trans('MachineNSerie').'</td><td colspan="2">';
@@ -2316,15 +2324,15 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
             print '<table class="nobordernopadding" width="100%"><tr><td nowrap="nowrap">';
             print $langs->trans('MachineModel').'</td><td align="left">';
             print '</td>';
-            if ($action != 'model' && $object->brouillon) print '<td align="right"><a href="'.$_SERVER['PHP_SELF'].'?action=model&amp;id='.$object->id.'">'.img_edit($langs->trans('Modify')).'</a></td>';
+            if ($action != 'm_model' && $object->brouillon) print '<td align="right"><a href="'.$_SERVER['PHP_SELF'].'?action=m_model&amp;id='.$object->id.'">'.img_edit($langs->trans('Modify')).'</a></td>';
             print '</tr></table>';
             print '</td><td colspan="3">';
-            if ($user->rights->repair->creer && $action == 'model')
+            if ($user->rights->repair->creer && $action == 'm_model')
             {
                 print '<form action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'" method="post">';
                 print '<input type="hidden" name="token" value="'.$_SESSION['newtoken'].'">';
                 print '<input type="hidden" name="action" value="set_model">';
-                print '<input type="text" class="flat" size="20" name="model" value="'.$object->model.'">';
+                print '<input type="text" class="flat" size="20" name="m_model" value="'.$object->model.'">';
                 print ' <input type="submit" class="button" value="'.$langs->trans('Modify').'">';
                 print '</form>';
             }
@@ -2723,7 +2731,7 @@ else if ($action == 'UnvalideRepair' && $user->rights->repair->ValidateRepair)
 			/*
 			 * Form to add new line
 			*/
-			if ($object->statut == 0 && $user->rights->repair->creer)
+			if ($object->statut == 0 && $object->on_process == 1 && $user->rights->repair->creer)
 			{
 				if ($action != 'editline')
 				{
